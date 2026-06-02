@@ -203,7 +203,77 @@ export const habits = [
     mechanisms: ["Gut microbiome destruction", "Hyper-palatability", "Inflammation"],
     dosage: "80%+ of calories from whole or minimally processed foods.", synergies: ["protein150"],
     gorkipedia: "If your great-grandmother wouldn't recognize it, be suspicious.",
-    risks: "Convenience loss." }
+    risks: "Convenience loss." },
+
+  { id: "smoking", name: "Smoking (avoid)", short: "NO SMOKING", cat: "vices", vitality: 61, qol: 58, diseases: 13, organs: ["lungs", "heart", "brain", "gut"], evidence: "5/5",
+    blurb: "The single most destructive voluntary habit. Accelerates aging across every measurable biomarker.",
+    mechanisms: ["Oxidative stress", "DNA damage", "Chronic inflammation", "Endothelial dysfunction"],
+    dosage: "Zero. Vaping is not a safe alternative.", synergies: ["noalcohol"],
+    gorkipedia: "One cigarette shortens lifespan by ~11 minutes on average. There is no safe threshold.",
+    risks: "COPD, cancer, heart disease, stroke, accelerated brain atrophy." },
+
+  { id: "vaping", name: "Vaping / Nicotine Pouches (avoid)", short: "NO VAPE", cat: "vices", vitality: 63, qol: 62, diseases: 10, organs: ["lungs", "heart", "brain", "mouth"], evidence: "4/5",
+    blurb: "Marketed as safe but still delivers ultrafine particles, heavy metals, and nicotine that damages the cardiovascular system.",
+    mechanisms: ["Vascular stiffness", "Oxidative lung damage", "Nicotine receptor desensitization"],
+    dosage: "Zero. Not a smoking cessation tool for most people.", synergies: ["smoking"],
+    gorkipedia: "The long-term data isn't in yet — and that's the problem. Early signs point to similar vascular damage.",
+    risks: "Popcorn lung (diacetyl), EVALI, nicotine addiction, gum disease." },
+
+  { id: "latenighteat", name: "Late-Night Eating (avoid)", short: "NO LATE EAT", cat: "nutrition", vitality: 66, qol: 70, diseases: 6, organs: ["gut", "liver", "brain"], evidence: "4/5",
+    blurb: "Eating within 2-3 hours of bed disrupts sleep architecture, insulin sensitivity, and circadian gut function.",
+    mechanisms: ["Delayed gastric emptying", "Elevated nocturnal insulin", "Melatonin suppression"],
+    dosage: "Finish last meal 3h+ before bed.", synergies: ["fast14", "sleep8"],
+    gorkipedia: "Your gut has a circadian clock. Midnight snacking confuses every metabolic signal.",
+    risks: "Reflux, weight gain, poor glucose control, fragmented sleep." },
+
+  { id: "chronicstress", name: "Chronic Stress Without Recovery (avoid)", short: "NO BURNOUT", cat: "mind", vitality: 62, qol: 65, diseases: 11, organs: ["brain", "heart", "immune", "gut"], evidence: "5/5",
+    blurb: "Unrelenting stress without daily recovery cycles is a slow-motion health catastrophe.",
+    mechanisms: ["Elevated cortisol", "HPA axis dysregulation", "Chronic inflammation", "Immune suppression"],
+    dosage: "Build recovery into every day: breathwork, walks, boundaries, sleep.", synergies: ["meditate20", "breathwork", "nature"],
+    gorkipedia: "Burnout isn't a badge of honor. It's a physiological failure mode.",
+    risks: "Heart disease, depression, autoimmune flares, cognitive decline." },
+
+  { id: "dehydration", name: "Chronic Dehydration (avoid)", short: "HYDRATE", cat: "nutrition", vitality: 67, qol: 69, diseases: 4, organs: ["brain", "kidneys", "heart", "joints"], evidence: "4/5",
+    blurb: "Even mild dehydration impairs cognition, energy, and kidney function. Most people are under-hydrated daily.",
+    mechanisms: ["Reduced plasma volume", "Impaired thermoregulation", "Kidney stone risk"],
+    dosage: "~2-3L water daily. More with heat, exercise, caffeine, or alcohol.", synergies: ["protein150"],
+    gorkipedia: "Thirst is a lagging indicator. By the time you feel it, performance has already dropped.",
+    risks: "Kidney stones, UTIs, headaches, fatigue, constipation." },
+
+  { id: "sedentary", name: "Sedentary Lifestyle (avoid)", short: "MOVE MORE", cat: "movement", vitality: 60, qol: 64, diseases: 12, organs: ["heart", "brain", "muscle", "bones", "metabolism"], evidence: "5/5",
+    blurb: "Sitting all day is an independent risk factor for death even if you exercise. Movement snacks matter.",
+    mechanisms: ["Reduced lipoprotein lipase", "Venous stasis", "Insulin resistance", "Muscle atrophy"],
+    dosage: "Move every 30-45min. 10k steps. Stand. Walk. Stretch.", synergies: ["10ksteps", "standing"],
+    gorkipedia: "Exercise doesn't undo sitting. You need both — regular training AND frequent movement.",
+    risks: "DVT, cardiovascular disease, sarcopenia, metabolic syndrome, depression." },
+
+  { id: "energydrinks", name: "Energy Drinks (avoid)", short: "NO ENERGY", cat: "vices", vitality: 59, qol: 61, diseases: 8, organs: ["heart", "brain", "gut", "adrenals"], evidence: "4/5",
+    blurb: "Extreme caffeine + sugar + stimulants spike cortisol, blood pressure, and anxiety. The crash is worse than the boost.",
+    mechanisms: ["Sympathetic overdrive", "Cortisol spike", "Blood pressure surge", "Sleep disruption"],
+    dosage: "Zero. Black coffee if you need caffeine.", synergies: ["noalcohol", "caffeinecut"],
+    gorkipedia: "A heart in a can. Emergency rooms see regular cardiac events from these.",
+    risks: "Arrhythmia, anxiety, panic attacks, caffeine toxicity, dependency." },
+
+  { id: "skipsunscreen", name: "Skipping Sunscreen (avoid)", short: "SUNSCREEN", cat: "recovery", vitality: 65, qol: 67, diseases: 7, organs: ["skin", "immune"], evidence: "4/5",
+    blurb: "UV exposure is the primary driver of skin aging and skin cancer. Daily SPF is non-negotiable.",
+    mechanisms: ["DNA photodamage", "Collagen breakdown", "Immune suppression in skin"],
+    dosage: "SPF 30+ on face/neck/hands daily. Reapply every 2h if outdoors.", synergies: ["morninglight"],
+    gorkipedia: "80% of visible facial aging is UV-related. The tan isn't worth it.",
+    risks: "Melanoma, basal cell carcinoma, photoaging, hyperpigmentation." },
+
+  { id: "poorposture", name: "All-Day Slouching (avoid)", short: "FIX POSTURE", cat: "movement", vitality: 62, qol: 66, diseases: 5, organs: ["spine", "brain", "lungs", "gut"], evidence: "3/5",
+    blurb: "Chronic slouching compresses organs, restricts breathing, and causes chronic neck and back pain.",
+    mechanisms: ["Thoracic kyphosis", "Reduced lung capacity", "Cervical strain", "Visceral compression"],
+    dosage: "Set posture reminders. Strengthen posterior chain. Use ergonomic setup.", synergies: ["posture", "standing"],
+    gorkipedia: "Your posture affects your mood, breathing, and digestion. It's not just aesthetics.",
+    risks: "Chronic pain, headaches, reduced energy, shallow breathing." },
+
+  { id: "neglectdental", name: "Neglecting Oral Hygiene (avoid)", short: "FLOSS", cat: "nutrition", vitality: 64, qol: 68, diseases: 6, organs: ["mouth", "heart", "brain", "gut"], evidence: "4/5",
+    blurb: "Gum disease is linked to cardiovascular disease, dementia, and diabetes. Flossing is not optional.",
+    mechanisms: ["Periodontal inflammation", "Bacterial translocation", "Systemic inflammation"],
+    dosage: "Brush 2x daily. Floss nightly. Dental checkups every 6 months.", synergies: ["protein150"],
+    gorkipedia: "Your mouth is the gateway to your body. Inflammation here spreads everywhere.",
+    risks: "Periodontitis, tooth loss, heart disease, Alzheimer's association, diabetes worsening." }
 ];
 
 export const habitCategories = [
