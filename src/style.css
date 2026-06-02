@@ -1,0 +1,18 @@
+/* AETHERIS — Tailwind entry + custom AAA styles */
+/* All premium visual design lives in styles/main.css (imported first) */
+@import '../styles/main.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Any Vite/modular-only tweaks can go here (currently none needed) */
+
+.constellation-btn.active {
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  color: #f4e9c8;
+}
+.constellation-btn {
+  border: 1px solid transparent;
+}

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AETHERIS • The Longevity Constellation (Modular)</title>
+  
+  <!-- Silence favicon 404 during local dev -->
+  <link rel="icon" href="data:,">
+  <!-- Note: CSS is now injected via Vite through src/main.js import -->
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class="bg-[#03050c] text-white h-screen overflow-hidden">
+  <!-- 
+    NOTE: This is the new modular entry point.
+    Fullscreen map + left info focus. No traditional website header or scrolling.
+  -->
+
+  <!-- Main App Shell: Left info column + full-height map (primary focus) -->
+  <div id="app-root" class="flex h-screen w-full">
+
+    <!-- Left Info / Detail Column (now primary sidebar on left) -->
+    <div class="w-80 shrink-0 flex flex-col border-r border-white/10 bg-[#020408] p-4">
+      <div class="px-1 mb-2">
+        <div class="text-[10px] uppercase tracking-[2px] text-white/35">INSPECTOR</div>
+      </div>
+      <div id="detail-panel" class="aaa-panel rounded-3xl border border-white/10 p-5 flex-1 flex flex-col overflow-y-auto min-h-0">
+        <div class="text-white/60 text-sm">Select a node on the map to inspect</div>
+      </div>
+    </div>
+
+    <!-- Main Map Area (fills remaining space, full height) -->
+    <div class="flex-1 relative h-full min-w-0">
+      <div class="tree-frame w-full h-full rounded-r-[2.25rem] bg-[#05070f] border border-white/10 border-l-0 overflow-hidden relative">
+        <canvas id="tree-canvas"
+                class="w-full h-full block bg-[#05070f] cursor-grab active:cursor-grabbing"></canvas>
+        
+        <!-- Logo placed in top-left of the map (subtle, inside the frame) -->
+        <div class="absolute top-4 left-4 z-[60] flex items-center gap-x-2.5 pointer-events-none select-none">
+          <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.45)] ring-1 ring-inset ring-white/10">
+            <i class="fa-solid fa-infinity text-[#03050c] text-2xl font-black"></i>
+          </div>
+          <div class="leading-none">
+            <div class="title-font text-2xl tracking-tighter font-bold text-white/95 drop-shadow">AETHERIS</div>
+            <div class="text-[9px] text-amber-400/70 -mt-0.5 tracking-[2px] font-semibold">LONGEVITY CONSTELLATION</div>
+          </div>
+        </div>
+        
+        <!-- Premium Floating Map Controls (top right of map) -->
+        <div class="absolute top-4 right-4 flex flex-col gap-1.5 z-50">
+          <button id="btn-zoom-in" 
+                  class="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#0a0d1a]/95 border border-white/20 hover:border-white/40 text-2xl font-light backdrop-blur-md shadow-2xl active:scale-[0.94] transition-all hover:text-amber-300">
+            +
+          </button>
+          <button id="btn-zoom-out" 
+                  class="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#0a0d1a]/95 border border-white/20 hover:border-white/40 text-3xl font-light backdrop-blur-md shadow-2xl active:scale-[0.94] transition-all hover:text-amber-300">
+            −
+          </button>
+          <button id="btn-recenter" 
+                  class="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#0a0d1a]/95 border border-amber-400/40 hover:border-amber-400/70 text-amber-300 backdrop-blur-md shadow-2xl active:scale-[0.94] transition-all"
+                  title="Recenter View">
+            <i class="fa-solid fa-crosshairs text-base"></i>
+          </button>
+
+          <!-- Constellation Switcher (inside the map UI) -->
+          <div class="mt-2 flex flex-col gap-1 bg-[#0a0d1a]/95 border border-white/15 rounded-2xl p-1 backdrop-blur-md">
+            <button id="btn-constellation-supplements"
+                    class="constellation-btn active px-3 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
+                    data-type="supplements">
+              <i class="fa-solid fa-pills text-amber-400"></i>
+              <span>Supplements</span>
+            </button>
+            <button id="btn-constellation-habits"
+                    class="constellation-btn px-3 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
+                    data-type="habits">
+              <i class="fa-solid fa-user-check text-emerald-400"></i>
+              <span>Habits</span>
+            </button>
+            <button id="btn-constellation-exercises"
+                    class="constellation-btn px-3 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
+                    data-type="exercises">
+              <i class="fa-solid fa-dumbbell text-orange-400"></i>
+              <span>Exercises</span>
+            </button>
+            <button id="btn-constellation-foods"
+                    class="constellation-btn px-3 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
+                    data-type="foods">
+              <i class="fa-solid fa-carrot text-emerald-400"></i>
+              <span>Foods</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Category group toggles -->
+        <div id="group-filters" class="absolute bottom-14 left-3 right-3 flex flex-wrap gap-1.5 z-40 pointer-events-auto max-h-24 overflow-y-auto"></div>
+
+        <!-- Premium status hint (now relative to map area) -->
+        <div class="absolute bottom-4 left-4 px-4 py-1.5 text-xs rounded-3xl bg-[#0a0d1a]/80 border border-white/10 text-white/60 backdrop-blur-sm pointer-events-none">
+          Hover nodes for preview • Click for details • Drag to pan • Toggle groups below
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Floating hover tooltip (read-only; click opens sidebar detail) -->
+  <div id="node-hover-popup" class="hidden fixed z-[70] pointer-events-none rounded-2xl px-3 py-2.5 w-[260px] text-sm shadow-xl"
+       style="background: linear-gradient(145deg, rgba(15,18,35,0.97), rgba(8,10,22,0.99)); border: 1px solid rgba(212,175,55,0.28);">
+    <div id="popup-name" class="font-semibold text-base tracking-tight title-font text-amber-100/95 leading-tight"></div>
+    <div class="flex items-center gap-2 mt-1 flex-wrap">
+      <div id="popup-vitality" class="font-mono text-[11px] px-1.5 py-0.5 rounded-md bg-amber-400/10 text-amber-200 border border-amber-400/25"></div>
+      <div id="popup-cat" class="text-[10px] uppercase tracking-widest text-white/45"></div>
+      <div id="popup-scores" class="text-[10px] font-mono text-white/50"></div>
+    </div>
+    <div id="popup-blurb" class="text-white/70 text-[11px] leading-snug mt-1.5 line-clamp-2"></div>
+    <div class="flex flex-wrap gap-1 mt-2" id="popup-organs"></div>
+  </div>
+
+  <!-- Explorer Modal -->
+  <div id="gorkipedia-explorer-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div class="aaa-panel w-full max-w-4xl rounded-3xl border border-amber-400/30 overflow-hidden flex flex-col max-h-[94vh]">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40">
+        <div class="flex items-center gap-x-3">
+          <div id="modal-name" class="text-3xl title-font tracking-tight"></div>
+          <div id="modal-vitality-badge" class="font-mono text-sm px-3 py-1 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-400 text-black font-bold"></div>
+        </div>
+        <div class="flex items-center gap-x-2">
+          <div class="px-3 py-1 text-xs rounded-2xl border border-amber-400/50 bg-amber-400/10 text-amber-300 flex items-center gap-x-1.5">
+            <i class="fa-solid fa-book"></i> <span>GORKIPEDIA VERIFIED</span>
+          </div>
+          <button onclick="window.AETHERIS?.modal?.close()" class="text-white/60 hover:text-white text-2xl leading-none px-2">×</button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-6 space-y-6 text-sm" style="scrollbar-width: thin;">
+        <!-- At-a-Glance + Organs -->
+        <div class="flex gap-4">
+          <div class="flex-1">
+            <div class="text-[10px] uppercase tracking-widest text-white/50 mb-1">AT A GLANCE</div>
+            <div id="modal-glance" class="flex gap-3 text-xs"></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-widest text-white/50 mb-1">SUPPORTED SYSTEMS</div>
+            <div id="modal-organs" class="flex flex-wrap gap-1"></div>
+          </div>
+        </div>
+
+        <!-- Mechanisms -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-[10px] uppercase tracking-widest text-white/50">MECHANISMS OF ACTION</div>
+          </div>
+          <div id="modal-mechanisms" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs"></div>
+        </div>
+
+        <!-- Studies -->
+        <div>
+          <div class="text-[10px] uppercase tracking-widest text-white/50 mb-2">KEY CLINICAL EVIDENCE</div>
+          <div id="modal-studies" class="space-y-2"></div>
+        </div>
+
+        <!-- Practical + Synergies -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <div class="text-[10px] uppercase tracking-widest text-white/50 mb-1">PRACTICAL PROTOCOL</div>
+            <div id="modal-dosage" class="text-sm bg-[#0a0d1a] p-3 rounded-2xl border border-white/10"></div>
+            <div id="modal-risks" class="text-xs text-orange-300/80 mt-2 px-1"></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-widest text-white/50 mb-1">SYNERGIES (click to highlight)</div>
+            <div id="modal-synergies" class="flex flex-wrap gap-1.5"></div>
+          </div>
+        </div>
+
+        <!-- Expanded Inspector Details (new timing/forms/deficiency/absorption) -->
+        <div>
+          <div class="text-[10px] uppercase tracking-widest text-white/50 mb-2">EXPANDED INSPECTOR DETAILS</div>
+          <div id="modal-expanded" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs"></div>
+        </div>
+
+        <!-- Gorkipedia Deep Dive -->
+        <div>
+          <div class="text-[10px] uppercase tracking-widest text-amber-400/80 mb-2 flex items-center gap-x-2">
+            <span>GORKIPEDIA DEEP ENTRY</span>
+          </div>
+          <div id="modal-gorkipedia" class="prose prose-invert text-sm leading-relaxed bg-[#0a0d1a] p-4 rounded-2xl border border-amber-400/10 max-h-64 overflow-auto text-white/90"></div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between border-t border-white/10 px-6 py-3 bg-black/30 text-xs">
+        <div class="flex gap-2">
+          <button onclick="window.AETHERIS?.modal?.highlightInTree()" class="px-4 py-1.5 rounded-2xl border border-white/15 hover:bg-white/5 flex items-center gap-x-2">
+            <i class="fa-solid fa-map"></i> <span>Center in Tree</span>
+          </button>
+          <button onclick="window.AETHERIS?.modal?.simulateStack()" class="px-4 py-1.5 rounded-2xl border border-white/15 hover:bg-white/5 flex items-center gap-x-2">
+            <i class="fa-solid fa-layer-group"></i> <span>Simulate Optimal Stack</span>
+          </button>
+        </div>
+        <div>
+          <button onclick="window.AETHERIS?.modal?.close()" class="px-5 py-1.5 rounded-2xl bg-white/10 hover:bg-white/15">Close Codex</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- The modular app will be bootstrapped here via ES modules -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

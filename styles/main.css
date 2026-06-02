@@ -1,0 +1,178 @@
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Playfair+Display:wght@700&amp;display=swap');
+    
+    :root {
+      --gold: #d4af37;
+      --cyan: #67e8f9;
+      --violet: #a78bfa;
+    }
+    
+    body {
+      font-family: 'Inter', system_ui, sans-serif;
+    }
+    
+    .title-font {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .epic-bg {
+      background: 
+        radial-gradient(circle at 50% 20%, rgba(103, 232, 249, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(167, 139, 250, 0.05) 0%, transparent 60%),
+        linear-gradient(#05070f, #03050c);
+    }
+
+    .glass {
+      background: rgba(10, 13, 26, 0.85);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(212, 175, 55, 0.15);
+    }
+
+    .node-glow {
+      filter: drop-shadow(0 0 8px rgba(103, 232, 249, 0.6)) 
+              drop-shadow(0 0 20px rgba(167, 139, 250, 0.3));
+    }
+
+    .gold-glow {
+      filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.7)) 
+              drop-shadow(0 0 25px rgba(212, 175, 55, 0.4));
+    }
+
+    .aaa-border {
+      box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.2),
+                  inset 0 1px 0 rgba(255,255,255,0.08),
+                  0 25px 50px -12px rgb(0 0 0 / 0.5);
+    }
+
+    .perk-node {
+      transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), 
+                  filter 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+      cursor: pointer;
+    }
+
+    .perk-node:hover {
+      transform: scale(1.08);
+      filter: brightness(1.15) saturate(1.1);
+    }
+
+    .constellation-line {
+      stroke: rgba(103, 232, 249, 0.25);
+      stroke-width: 1.5;
+      stroke-dasharray: 3 3;
+      transition: stroke 0.3s ease, stroke-opacity 0.3s ease;
+    }
+
+    .constellation-line.active {
+      stroke: #67e8f9;
+      stroke-opacity: 0.9;
+      stroke-dasharray: 0;
+      filter: drop-shadow(0 0 4px #67e8f9);
+    }
+
+    .skill-label {
+      font-size: 9px;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    }
+
+    .organ {
+      transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      cursor: pointer;
+    }
+
+    .organ.active {
+      filter: brightness(1.6) saturate(1.5) drop-shadow(0 0 12px currentColor);
+      transform: scale(1.03);
+    }
+
+    .vitality-score {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .section-header {
+      font-size: 10px;
+      letter-spacing: 2px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .epic-text {
+      background: linear-gradient(90deg, #d4af37, #f0d9a8, #d4af37);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-size: 200% 100%;
+      animation: shimmer 4s linear infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .stat-bar {
+      height: 6px;
+      background: linear-gradient(90deg, #67e8f9, #a78bfa);
+      border-radius: 999px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-bar::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,0.45),
+        transparent
+      );
+      animation: scan 2.5s ease-in-out infinite;
+    }
+
+    @keyframes scan {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(300%); }
+    }
+
+    .tree-frame {
+      box-shadow: 
+        0 0 0 1px rgba(212, 175, 55, 0.2),
+        0 0 0 8px rgba(10, 13, 26, 0.6),
+        0 30px 70px -15px rgb(0 0 0 / 0.6);
+    }
+
+    .perk-tooltip {
+      background: #0a0d1a;
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.6);
+    }
+
+    .aaa-panel {
+      background: linear-gradient(145deg, rgba(15, 18, 35, 0.95), rgba(8, 10, 22, 0.97));
+      border: 1px solid rgba(212, 175, 55, 0.18);
+    }
+
+    .node-label {
+      text-shadow: 0 2px 4px rgba(0,0,0,0.85),
+                   0 0 8px rgba(0,0,0,0.6);
+    }
+
+    .celestial {
+      animation: celestial-drift 25s linear infinite;
+    }
+
+    .supplement-card {
+      transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .glow-cyan {
+      box-shadow: 0 0 15px rgba(103, 232, 249, 0.3);
+    }
+
+    .game-ui-text {
+      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    }
