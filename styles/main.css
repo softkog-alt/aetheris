@@ -176,3 +176,52 @@
     .game-ui-text {
       text-shadow: 0 1px 2px rgba(0,0,0,0.6);
     }
+
+    /* 6.5 Custom scrollbars for long entries (detail panel, modal gorkipedia, aaa-panels, group filters at bottom) */
+    .aaa-panel, #detail-panel, .prose, #modal-gorkipedia, #gorkipedia-explorer-modal .aaa-panel, #group-filters {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(245, 158, 11, 0.35) rgba(10, 13, 26, 0.6);
+    }
+    .aaa-panel::-webkit-scrollbar,
+    #detail-panel::-webkit-scrollbar,
+    #modal-gorkipedia::-webkit-scrollbar,
+    #group-filters::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .aaa-panel::-webkit-scrollbar-track,
+    #detail-panel::-webkit-scrollbar-track,
+    #modal-gorkipedia::-webkit-scrollbar-track,
+    #group-filters::-webkit-scrollbar-track {
+      background: rgba(10, 13, 26, 0.6);
+      border-radius: 3px;
+    }
+    .aaa-panel::-webkit-scrollbar-thumb,
+    #detail-panel::-webkit-scrollbar-thumb,
+    #modal-gorkipedia::-webkit-scrollbar-thumb,
+    #group-filters::-webkit-scrollbar-thumb {
+      background: rgba(245, 158, 11, 0.35);
+      border-radius: 3px;
+    }
+    .aaa-panel::-webkit-scrollbar-thumb:hover,
+    #detail-panel::-webkit-scrollbar-thumb:hover,
+    #modal-gorkipedia::-webkit-scrollbar-thumb:hover,
+    #group-filters::-webkit-scrollbar-thumb:hover {
+      background: rgba(251, 191, 36, 0.55);
+    }
+
+    /* Bottom filters row (horizontal scroller for node category chips): ensure custom thin amber scrollbar appears when content overflows */
+    #group-filters {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(245, 158, 11, 0.35) rgba(10, 13, 26, 0.5);
+      min-height: 22px;
+    }
+    #bottom-controls {
+      box-shadow: 0 -1px 0 rgba(0,0,0,0.6);
+    }
+
+    /* 9.1 OLED / deep-space black theming polish */
+    body { background: #000000; }
+    .tree-frame { background: #020408; }
+    .aaa-panel { background: #05070f; border-color: rgba(245,158,11,0.18); }
+    #detail-panel { background: #05070f; }

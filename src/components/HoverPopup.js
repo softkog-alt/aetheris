@@ -21,6 +21,10 @@ export class HoverPopup {
 
     this.currentId = node.id;
 
+    // Always clear any stale high-dose notes before building new content
+    const oldNotes = this.el.querySelectorAll('.popup-high-dose-note');
+    oldNotes.forEach(n => n.remove());
+
     const pad = 16;
     const cardW = 260;
     const cardH = 140;
@@ -65,8 +69,8 @@ export class HoverPopup {
     const isNegHover = !!(node.impact === 'negative' || node._isNegative);
     if (hasHighDose && !isNegHover) {
       const note = document.createElement('div');
-      note.className = 'text-[9px] text-orange-400/80 mt-1 flex items-center gap-1';
-      note.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> High dose risks documented';
+      note.className = 'text-[9px] text-orange-400/80 mt-1 flex items-center gap-1 popup-high-dose-note popup-blink';
+      note.innerHTML = '<span class="popup-blink">⚠ High dose risks documented</span>';
       organsEl.parentNode.appendChild(note);
     }
 

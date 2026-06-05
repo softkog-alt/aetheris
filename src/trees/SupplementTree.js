@@ -82,13 +82,26 @@ export class SupplementTree extends BaseTree {
 
     const cats = [...new Set(this.nodes.map(n => n.cat).filter(Boolean))];
     this.enabledGroups = new Set(cats);
+    this.maxNodes = 0; // 0 = unlimited (top N via slider). Sorted by vitality for limits.
 
     this.computeLayout();
   }
 
+  setMaxNodes(n) {
+    this.maxNodes = Math.max(0, Math.min(200, n | 0));
+    this._afterGroupChange();
+  }
+
   _getVisibleNodes() {
-    if (!this.enabledGroups || this.enabledGroups.size === 0) return this.nodes;
-    return this.nodes.filter(n => this.enabledGroups.has(n.cat));
+    let vis = (!this.enabledGroups || this.enabledGroups.size === 0)
+      ? this.nodes
+      : this.nodes.filter(n => this.enabledGroups.has(n.cat));
+
+    if (this.maxNodes > 0 && vis.length > this.maxNodes) {
+      // Highest vitality first; layout + orbit math already places top vitality closer to center within clusters.
+      vis = [...vis].sort((a, b) => (b.vitality || 0) - (a.vitality || 0)).slice(0, this.maxNodes);
+    }
+    return vis;
   }
 
   isGroupEnabled(key) {
@@ -119,10 +132,23 @@ export class SupplementTree extends BaseTree {
     this._afterGroupChange();
   }
 
+  /** Toggle between all groups enabled and all groups disabled (for ALL chip + 'f' key quick reset). */
+  toggleAllGroups() {
+    const cats = [...new Set(this.nodes.map(n => n.cat).filter(Boolean))];
+    const allOn = cats.length > 0 && this.enabledGroups.size === cats.length;
+    if (allOn) {
+      this.enabledGroups = new Set();
+    } else {
+      this.enabledGroups = new Set(cats);
+    }
+    this._afterGroupChange();
+  }
+
   _afterGroupChange() {
+    // Deselect if the current selection is no longer in the visible set (group filter OR maxNodes limit)
     if (this.selectedId) {
-      const sel = this.nodes.find(n => n.id === this.selectedId);
-      if (sel && !this.isGroupEnabled(sel.cat)) {
+      const vis = this._getVisibleNodes();
+      if (!vis.some(n => n.id === this.selectedId)) {
         this.selectedId = null;
         this.hoveredId = null;
       }
@@ -159,9 +185,11 @@ export class SupplementTree extends BaseTree {
   _layoutSpacingParams() {
     const n = this._getVisibleNodes().length || 1;
     const density = Math.sqrt(n / 20);
+    // Dynamic for dense constellations (e.g. 100+ foods): more padding/iterations but cap to avoid jank
+    const settleCap = n > 80 ? 110 : 140;
     return {
       collisionPadding: 14 + density * 7,
-      settleIterations: Math.min(140, 60 + n * 3),
+      settleIterations: Math.min(settleCap, 55 + Math.floor(n * 2.8)),
       bodyPadding: 18 + density * 5,
       labelMargin: SupplementTree.NODE_HALO
     };
@@ -297,7 +325,8 @@ export class SupplementTree extends BaseTree {
       }
     }
 
-    for (let k = 0; k < 12; k++) {
+    const bodyIters = Math.min(12, 6 + Math.floor(nodes.length / 12));
+    for (let k = 0; k < bodyIters; k++) {
       let any = false;
       for (const n of nodes) {
         if (this._pushOutsideBody(n, bodyPad, halo)) any = true;
@@ -314,7 +343,8 @@ export class SupplementTree extends BaseTree {
     const bodyPad = spacing.bodyPadding;
     const halo = spacing.labelMargin ?? SupplementTree.NODE_HALO;
 
-    for (let attempt = 0; attempt < 40; attempt++) {
+    const maxAttempts = Math.min(38, 18 + Math.floor(nodes.length / 5));
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       let fixed = false;
 
       for (const n of nodes) {
@@ -498,13 +528,14 @@ export class SupplementTree extends BaseTree {
 
     // Draw the central body model (silhouette + organs) -- now larger
     // We highlight organs that the currently selected node influences.
-    const selectedNodeForBody = this.selectedId ? this.nodes.find(n => n.id === this.selectedId) : null;
+    const visibleNodes = this._getVisibleNodes();
+    const selectedNodeForBody = this.selectedId ? visibleNodes.find(n => n.id === this.selectedId) || null : null;
     const highlightOrgs = selectedNodeForBody ? (selectedNodeForBody.organs || []) : [];
     const isNegativeImpact = !!(selectedNodeForBody && (selectedNodeForBody.impact === 'negative' || selectedNodeForBody._isNegative));
     this._drawCentralBody(ctx, 0, 0, 3.15, highlightOrgs, isNegativeImpact);
 
-    this.nodes.forEach(node => {
-      if (!this.isGroupEnabled(node.cat)) return;
+    visibleNodes.forEach(node => {
+      // visibleNodes already respects enabled groups + maxNodes limit; no extra filter needed
 
       const isSelected = this.selectedId === node.id;
       const isHovered = this.hoveredId === node.id;

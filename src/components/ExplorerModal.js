@@ -56,20 +56,42 @@ export class ExplorerModal {
       <div class="bg-[#0a0d1a] px-3 py-1.5 rounded-2xl border border-white/10">${cLabel} <span class="font-mono ${isNeg ? 'text-red-400' : 'text-emerald-400'}">${node.diseases}</span></div>
     `;
 
-    // Organs
+    // Organs (clickable for benefit explanations, 6.2 + 7.1)
     const orgEl = document.getElementById('modal-organs');
     orgEl.innerHTML = '';
+    const organHintMap = {
+      brain: 'Supports cognition, neuroprotection & mood via BDNF, membrane fluidity, reduced inflammation.',
+      heart: 'Cardioprotective: endothelial function, lipid profiles, mitochondrial efficiency.',
+      immune: 'Modulates inflammation & immune surveillance; cytokine balance, barrier integrity.',
+      mito: 'Enhances mitochondrial biogenesis, ATP, and reduces oxidative stress.',
+      muscle: 'Anabolic/anti-catabolic, protein synthesis, recovery, sarcopenia resistance.',
+      metabolic: 'Insulin sensitivity, AMPK, glucose/lipid handling, metabolic flexibility.',
+      gut: 'Microbiome support, barrier strength, SCFA/butyrate, reduced endotoxemia.',
+      joints: 'Cartilage matrix, anti-inflammatory on connective tissue, collagen synthesis.',
+      eyes: 'Macular pigment protection, retina oxidative damage reduction.',
+      liver: 'Phase II detox, NF-κB/Nrf2, fat metabolism, hepatocyte protection.'
+    };
+    let organBenefitHost = document.getElementById('modal-organ-benefit');
+    if (!organBenefitHost) {
+      organBenefitHost = document.createElement('div');
+      organBenefitHost.id = 'modal-organ-benefit';
+      organBenefitHost.className = 'text-[10px] mt-1 px-1 text-white/75 hidden';
+      if (orgEl.parentElement) orgEl.parentElement.appendChild(organBenefitHost);
+    }
     (node.organs || []).forEach(key => {
       const meta = window.AETHERIS_ORGAN_META?.[key];
       if (!meta) return;
       const c = document.createElement('div');
-      c.className = 'px-2.5 py-1 text-xs rounded-2xl cursor-pointer flex items-center gap-x-1.5 border';
+      c.className = 'px-2.5 py-1 text-xs rounded-2xl cursor-pointer flex items-center gap-x-1.5 border hover:scale-[1.02] active:scale-[0.98] transition';
       c.style.borderColor = meta.color + '44';
       c.style.background = meta.color + '12';
       c.innerHTML = `<i class="fa-solid ${meta.icon}" style="color:${meta.color}"></i><span style="color:${meta.color}">${meta.label}</span>`;
       c.onclick = () => {
-        // Pulse effect on main diagram if available
-        console.log('[Explorer] Organ clicked:', key);
+        const hint = organHintMap[key] || 'Key longevity organ system targeted.';
+        const rel = (node.mechanisms || []).filter(m => m.toLowerCase().includes(key) || (key==='brain' && /neuro|bdnf|cog/i.test(m)) || (key==='heart' && /cardio|endoth|vascular/i.test(m))).slice(0,1);
+        organBenefitHost.innerHTML = `<span class="text-[10px] font-semibold" style="color:${meta.color}">${meta.label}:</span> ${hint} ${rel.length ? ' <span class="text-white/50">Via: ' + rel[0] + '</span>' : ''}`;
+        organBenefitHost.classList.remove('hidden');
+        organBenefitHost.onclick = () => organBenefitHost.classList.add('hidden');
       };
       orgEl.appendChild(c);
     });
@@ -110,19 +132,23 @@ export class ExplorerModal {
         <button class="text-[10px] px-2 py-1 border border-white/20 rounded-lg hover:bg-white/5">Cite</button>
       `;
       card.querySelector('button').onclick = (e) => {
-        e.target.textContent = 'Copied!';
-        setTimeout(() => { if (card.querySelector('button')) card.querySelector('button').textContent = 'Cite'; }, 1200);
+        const btn = e.target;
+        const citeText = `${s.year} — ${s.finding}. ${s.source || 'Primary literature'}. (AETHERIS monograph)`;
+        navigator.clipboard?.writeText(citeText).then(() => {
+          btn.textContent = 'Copied!';
+          setTimeout(() => { if (btn && btn.isConnected) btn.textContent = 'Cite'; }, 1400);
+        }).catch(() => {
+          btn.textContent = 'Copy failed';
+          setTimeout(() => { if (btn && btn.isConnected) btn.textContent = 'Cite'; }, 900);
+        });
       };
       studyEl.appendChild(card);
     });
 
-    // Dosage + Risks
+    // Dosage + Risks (deduped highDoseRisks into unified Safety Profile below)
     document.getElementById('modal-dosage').innerHTML = `<span class="text-white/60">Typical:</span> ${node.dosage || 'Consult clinical guidance'}`;
-    let risksHtml = node.risks ? `<i class="fa-solid fa-exclamation-triangle mr-1"></i>${node.risks}` : '';
-    if (node.highDoseRisks) {
-      risksHtml += `<div class="mt-1 text-[10px] text-orange-300/90"><i class="fa-solid fa-exclamation-circle mr-1"></i><strong>HIGH DOSE:</strong> ${node.highDoseRisks}</div>`;
-    }
-    document.getElementById('modal-risks').innerHTML = risksHtml;
+    let risksHtml = node.risks ? `<i class="fa-solid fa-exclamation-triangle mr-1"></i>${node.risks}` : (isNeg ? '<span class="text-red-300/80">Documented negative effects — see mechanisms.</span>' : '');
+    document.getElementById('modal-risks').innerHTML = risksHtml || '<span class="text-white/40">Generally well-tolerated at standard doses.</span>';
 
     // Synergies
     const synEl = document.getElementById('modal-synergies');
@@ -142,6 +168,40 @@ export class ExplorerModal {
       synEl.innerHTML = `<span class="text-white/50 text-xs">Strong synergy with magnesium, omega-3, and vitamin D families.</span>`;
     }
 
+    // 7.2 + 7.3 + 8.1: Share monograph + external sources (constructed, no node data changes)
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'mt-2 flex items-center gap-2';
+    actionsRow.innerHTML = `
+      <button id="modal-share-btn" class="text-[10px] px-3 py-1 rounded-2xl border border-white/20 hover:bg-white/10 flex items-center gap-1 text-white/80"><i class="fa-brands fa-x-twitter"></i> <span>Share</span></button>
+      <button id="modal-ext-btn" class="text-[10px] px-3 py-1 rounded-2xl border border-white/20 hover:bg-white/10 text-white/80">External sources ↗</button>
+      <span class="text-[9px] text-white/40 ml-1">Similar: ${syns.length ? syns.slice(0,3).join(', ').toUpperCase() : 'see organ overlap in map'}</span>
+    `;
+    // Insert after synergies container's parent section (the synergies card)
+    const synContainer = synEl.parentElement;
+    if (synContainer && synContainer.parentElement) {
+      synContainer.parentElement.insertBefore(actionsRow, synContainer.nextSibling);
+    } else if (synContainer) {
+      synContainer.appendChild(actionsRow);
+    }
+    // Wire share
+    const shareBtn = actionsRow.querySelector('#modal-share-btn');
+    if (shareBtn) {
+      shareBtn.onclick = () => {
+        const txt = `${node.name} scores ${node.vitality || node.longevity} VS on AETHERIS. ${node.blurb || ''} aetheris.app 🧬`;
+        navigator.clipboard?.writeText(txt).catch(()=>{});
+        window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(txt)}`, '_blank', 'width=560,height=420');
+      };
+    }
+    const extBtn = actionsRow.querySelector('#modal-ext-btn');
+    if (extBtn) {
+      extBtn.onclick = () => {
+        // Only point to Gorkipedia article (7.3). Prefer explicit node.url on the entry; fallback by id.
+        const grokUrl = node.url || node.grokipediaUrl || `https://grokipedia.app/${node.id}`;
+        window.open(grokUrl, '_blank');
+      };
+      extBtn.textContent = 'Gorkipedia ↗';
+    }
+
     // Expanded inspector details (new fields for richer inspector)
     const expEl = document.getElementById('modal-expanded');
     if (expEl) {
@@ -159,14 +219,30 @@ export class ExplorerModal {
         card.innerHTML = `<div class="uppercase tracking-widest text-[9px] text-white/50 mb-0.5">${d.label}</div><div class="text-white/85">${d.val}</div>`;
         expEl.appendChild(card);
       });
-      if (node.highDoseRisks) {
-        const warn = document.createElement('div');
-        warn.className = 'p-2.5 bg-orange-950/40 rounded-2xl border border-orange-500/40 text-[11px] col-span-1 md:col-span-2';
-        warn.innerHTML = `<div class="uppercase tracking-widest text-[9px] text-orange-400 mb-0.5 flex items-center gap-1"><i class="fa-solid fa-exclamation-triangle"></i> HIGH DOSE RISKS / CAUTIONS</div><div class="text-orange-200/90">${node.highDoseRisks}</div>`;
-        expEl.appendChild(warn);
-      }
       if (!expEl.children.length) {
         expEl.innerHTML = `<span class="text-white/40 text-xs">Additional practical details available in full codex entries.</span>`;
+      }
+    }
+
+    // 6.3 Deduped Safety Profile card (single source of truth for risks + highDoseRisks)
+    const safetyHost = document.getElementById('modal-risks'); // reuse the risks container area for the unified card
+    if (safetyHost && (node.highDoseRisks || node.risks)) {
+      // If we already put simple text, upgrade the whole block to a nice collapsible Safety Profile
+      const hasHigh = !!node.highDoseRisks;
+      const hasRisk = !!node.risks;
+      const safety = document.createElement('div');
+      safety.className = 'mt-2 p-2.5 rounded-2xl border text-[11px] ' + (isNeg ? 'bg-red-950/30 border-red-500/30' : 'bg-orange-950/30 border-orange-500/30');
+      let html = `<div class="uppercase tracking-widest text-[9px] ${isNeg ? 'text-red-400' : 'text-orange-400'} mb-1 flex items-center gap-1"><i class="fa-solid fa-shield-halved"></i> SAFETY PROFILE</div>`;
+      if (hasRisk) html += `<div class="text-white/85">${node.risks}</div>`;
+      if (hasHigh) {
+        html += `<div class="mt-1.5 pt-1.5 border-t border-white/10 text-orange-200/95"><span class="font-semibold text-orange-300">HIGH DOSE / CAUTION:</span> ${node.highDoseRisks}</div>`;
+      }
+      // Make the safety section collapsible for long content (6.5 spirit)
+      safety.innerHTML = html + `<div class="text-[9px] mt-1 text-white/40 cursor-pointer select-none" onclick="this.parentElement.classList.toggle('max-h-12');this.parentElement.classList.toggle('overflow-hidden');this.textContent = this.textContent.includes('more') ? 'less' : 'more…'">more…</div>`;
+      // Only inject if not already a full profile (avoid double on re-open edge)
+      if (!safetyHost.querySelector('.fa-shield-halved')) {
+        safetyHost.innerHTML = '';
+        safetyHost.appendChild(safety);
       }
     }
 

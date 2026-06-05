@@ -1,5 +1,82 @@
-// Auto-extracted from original monolith during modular refactoring
-// Full rich dataset (mechanisms, gorkipedia entries, studies, etc.)
+/**
+ * SUPPLEMENTS NODE TEMPLATE — Inspector & Modal Compatibility Contract
+ *
+ * Every node object in this array powers the left-hand inspector panel (updateDetail),
+ * the ExplorerModal ("Read full monograph"), organ chips, share buttons, external links,
+ * body highlighting, and the Node Limit vitality sorting.
+ *
+ * REQUIRED (no graceful fallback in inspector):
+ *   id: string (unique, kebab-case, used for selection, URL fallback, etc.)
+ *   name: string (display title)
+ *   short: string (compact label in chips / header)
+ *   cat: string (category key — used for group filtering; e.g. "foundational" | "cardio" | "immune" | "mito" | "muscle" | ...)
+ *   longevity: number (0-100, primary longevity score)
+ *   qol: number (0-100, quality-of-life score)
+ *   organs: string[] (keys from organMeta: brain|heart|immune|mito|muscle|metabolic|gut|joints|eyes|liver|bones)
+ *   evidence: string (e.g. "5/5", "4/5")
+ *   blurb: string (short description shown under scores)
+ *
+ * RICH / HIGHLY RECOMMENDED (used by inspector + modal sections):
+ *   vitality: number (overall score shown in the 3rd metric box; modal falls back to longevity||70.
+ *                     Include this explicitly for best results; many rich nodes have it.)
+ *   mechanisms: string[] (top 3 shown in inspector "MECHANISMS" section; also feeds organ click explanations)
+ *   studies: { year: number, finding: string, source?: string }[] (first entry shown in inspector; all shown in modal)
+ *   dosage: string (shown in "SERVING / PROTOCOL")
+ *   timing: string (shown under dosage)
+ *   bestForms: string (shown under timing)
+ *   deficiencySigns: string | string[] (shown in modal "more..." meta rows)
+ *   absorption: string (shown in modal meta)
+ *   risks: string (shown for negative-impact nodes or as fallback)
+ *   highDoseRisks: string (preferred for the orange "HIGH DOSE / CAUTION" box in inspector + SAFETY PROFILE in modal)
+ *   synergies: string[] (ids of other nodes; shown in modal)
+ *   gorkipedia: string (long-form HTML/text for the modal's "Gorkipedia" deep-dive tab — the richest content)
+ *   url: string (e.g. "https://grokipedia.app/magnesium") — NEW: makes the External sources ↗ button open ONLY this.
+ *                 If omitted, button falls back to `https://grokipedia.app/${id}`.
+ *   impact: 'negative' (marks harm/damage nodes; flips colors, labels, and risk display)
+ *
+ * CONVENTIONS & TIPS FOR MAX COMPATIBILITY:
+ *   - Use the exact organ keys above so organ chips + body highlighting work.
+ *   - Put the most important 3 mechanisms first (they are sliced to [0,2]).
+ *   - studies[0] is the one the inspector highlights; keep findings concise.
+ *   - highDoseRisks > risks for the caution UI (modal dedupes both).
+ *   - gorkipedia can be multi-paragraph; it is rendered as innerHTML in the modal.
+ *   - The two nodes updated as examples (magnesium, creatine) now include the `url` field.
+ *   - For negative-impact nodes also supply a clear `risks` or `highDoseRisks`.
+ *   - vitality is the canonical "Overall" number rendered in the inspector grid (no || fallback there).
+ *
+ * EXAMPLE OF A COMPLETE, INSPECTOR-COMPATIBLE NODE (magnesium after the example update):
+ *   {
+ *     id: "magnesium",
+ *     name: "Magnesium (Glycinate)",
+ *     short: "MAGNESIUM",
+ *     cat: "foundational",
+ *     longevity: 84,
+ *     qol: 88,
+ *     diseases: 9,
+ *     organs: ["brain", "heart", "muscle", "bones"],
+ *     evidence: "4/5",
+ *     blurb: "Involved in 300+ enzymatic reactions. Strongly linked to lower all-cause mortality...",
+ *     vitality: 84,                    // explicit overall score (recommended)
+ *     mechanisms: ["ATP stabilization (energy currency)", "NMDA receptor modulation (calm)", ...],
+ *     studies: [{year:2023, finding:"Lower all-cause mortality...", source:"Nutrients"}, ...],
+ *     dosage: "300–420 mg elemental (glycinate/threonate best for brain/sleep)",
+ *     timing: "Evening 1-2h before bed for sleep benefits; split AM/PM if >350mg.",
+ *     bestForms: "Glycinate (sleep/calm), Threonate (brain), Taurate (cardio), Citrate...",
+ *     deficiencySigns: "Muscle cramps/twitches, insomnia, anxiety/irritability...",
+ *     absorption: "Chelated forms (glycinate etc) have superior bioavailability...",
+ *     risks: "GI upset at very high doses. Reduce if kidney impairment.",
+ *     highDoseRisks: "Supplemental elemental magnesium >350-400 mg/day often causes diarrhea...",
+ *     synergies: ["vitd", "taurine", "bcomplex", "ltheanine"],
+ *     gorkipedia: "Gorkipedia Entry: The forgotten mineral whose deficiency is nearly universal...",
+ *     url: "https://grokipedia.app/magnesium"   // <-- makes External sources button point here only
+ *   }
+ *
+ * When adding new nodes, copy this shape. The inspector gracefully degrades missing optional fields,
+ * but providing the rich set above gives the best user experience (full protocol, studies, safety, etc.).
+ *
+ * Auto-extracted from original monolith during modular refactoring.
+ * Full rich dataset (mechanisms, gorkipedia entries, studies, etc.).
+ */
 
 export const supplements = [
       { id: "omega3", name: "Omega-3 EPA/DHA", short: "OMEGA-3", cat: "cardio", longevity: 92, qol: 81, diseases: 14, organs: ["heart", "brain", "eyes"], evidence: "5/5", blurb: "Landmark studies link higher Omega-3 Index to +4.7 years life expectancy. Potent anti-inflammatory. Protects telomeres and brain membranes.",
@@ -28,6 +105,7 @@ export const supplements = [
         studies: [{year:2023, finding:"Lower all-cause mortality with higher dietary Mg (meta 1.1M participants)", source:"Nutrients"}, {year:2024, finding:"Improved sleep latency & muscle function in elderly", source:"RCT"}, {year:2022, finding:"Reduced migraine frequency & anxiety scores (meta)", source:"Headache & Nutrients"}],
         dosage: "300–420 mg elemental (glycinate/threonate best for brain/sleep)", synergies: ["vitd", "taurine", "bcomplex", "ltheanine"],
         gorkipedia: "Gorkipedia Entry: The forgotten mineral whose deficiency is nearly universal in modern diets. Master cofactor for energy, nervous system calm, and hundreds of longevity-relevant enzymes. Glycinate form is the daily driver for most humans seeking better sleep and lower allostatic load. Threonate form crosses BBB better for cognitive applications.",
+        url: "https://grokipedia.app/magnesium",
         risks: "GI upset at very high doses. Reduce if kidney impairment.",
         highDoseRisks: "Supplemental elemental magnesium >350-400 mg/day often causes diarrhea/loose stools (osmotic). In impaired kidney function, risk of hypermagnesemia (low BP, nausea, cardiac issues). Stick to 200-400 mg elemental from glycinate/threonate for daily use.",
         timing: "Evening 1-2h before bed for sleep benefits; split AM/PM if >350mg.",
@@ -39,6 +117,7 @@ export const supplements = [
         studies: [{year:2019, finding:"Significant strength & muscle gains in older adults (meta)", source:"JCM"}, {year:2023, finding:"Improved cognition under stress & in elderly", source:"Multiple RCTs"}, {year:2024, finding:"Reduced frailty markers & improved bone mineral in postmenopausal women", source:"J Bone Miner Metab"}],
         dosage: "5 g daily (no loading needed for longevity use)", synergies: ["protein/collagen", "magnesium", "omega3", "hmb"],
         gorkipedia: "Gorkipedia Entry: Once just for bodybuilders, now recognized as a foundational anti-sarcopenia and brain-health molecule. One of the safest, cheapest, and most evidence-dense supplements in existence. Particularly powerful for women post-menopause and anyone over 50. Vegetarians/vegans often have lower baseline stores and respond robustly.",
+        url: "https://grokipedia.app/creatine",
         risks: "Very safe. Minor water retention for some. Stay hydrated.",
         timing: "Any time daily; post-workout with carbs/protein optional for athletes. Consistency > timing.",
         bestForms: "Creapure® micronized monohydrate (most researched & purest). No need for fancy forms.",

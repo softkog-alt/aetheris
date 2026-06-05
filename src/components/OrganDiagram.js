@@ -40,23 +40,23 @@ export class OrganDiagram {
 
     // Background soft body silhouette
     const body = document.createElementNS(ns, 'path');
-    body.setAttribute('d', 'M85 22 Q72 48 76 92 Q79 130 72 170 Q85 184 98 170 Q90 130 95 92 Q100 48 85 22');
+    body.setAttribute('d', 'M 85 10 C 70 30, 65 70, 70 120 C 75 160, 75 180, 85 180 C 95 180, 95 160, 100 120 C 105 70, 100 30, 85 10');
     body.setAttribute('fill', 'none');
-    body.setAttribute('stroke', '#374151');
-    body.setAttribute('stroke-width', '11');
+    body.setAttribute('stroke', '#475569');
+    body.setAttribute('stroke-width', '4');
     body.setAttribute('stroke-linecap', 'round');
-    body.setAttribute('opacity', '0.45');
+    body.setAttribute('opacity', '0.6');
     svg.appendChild(body);
 
-    // Head
+    // Head (more proportional)
     const head = document.createElementNS(ns, 'circle');
     head.setAttribute('cx', '85');
-    head.setAttribute('cy', '26');
-    head.setAttribute('r', '13');
+    head.setAttribute('cy', '18');
+    head.setAttribute('r', '10');
     head.setAttribute('fill', 'none');
-    head.setAttribute('stroke', '#374151');
-    head.setAttribute('stroke-width', '7');
-    head.setAttribute('opacity', '0.55');
+    head.setAttribute('stroke', '#475569');
+    head.setAttribute('stroke-width', '4');
+    head.setAttribute('opacity', '0.6');
     svg.appendChild(head);
 
     // Brain (inside head)

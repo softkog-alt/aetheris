@@ -4,12 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AETHERIS • The Longevity Constellation (Modular)</title>
+  <!-- 12 Social meta (quick win) -->
+  <meta property="og:title" content="AETHERIS • Longevity Constellation">
+  <meta property="og:description" content="Interactive map of supplements, habits, exercises &amp; foods for human longevity. Explore mechanisms, studies, and synergies in the Aetheris codex.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://aetheris.app">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AETHERIS • Longevity Constellation">
+  <meta name="twitter:description" content="Interactive map of supplements, habits, exercises &amp; foods for human longevity.">
   
   <!-- Silence favicon 404 during local dev -->
   <link rel="icon" href="data:,">
   <!-- Note: CSS is now injected via Vite through src/main.js import -->
   
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    @keyframes popup-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .popup-blink {
+      animation: popup-blink 3s infinite;
+    }
+  </style>
 </head>
 <body class="bg-[#03050c] text-white h-screen overflow-hidden">
   <!-- 
@@ -27,6 +44,17 @@
       </div>
       <div id="detail-panel" class="aaa-panel rounded-3xl border border-white/10 p-5 flex-1 flex flex-col overflow-y-auto min-h-0">
         <div class="text-white/60 text-sm">Select a node on the map to inspect</div>
+      </div>
+
+      <!-- Personal Corner (3.1): collapsible personalization form + insights below inspector -->
+      <div class="mt-3 shrink-0">
+        <div class="px-1 mb-1 flex items-center justify-between cursor-pointer select-none" id="personal-header">
+          <div class="text-[10px] uppercase tracking-[2px] text-white/35">PERSONAL CORNER</div>
+          <button id="personal-collapse-btn" class="text-white/40 hover:text-amber-300 text-xs transition" title="Toggle">▾</button>
+        </div>
+        <div id="personal-panel" class="aaa-panel rounded-3xl border border-white/10 p-4 text-xs overflow-y-auto max-h-[380px] hidden">
+          <!-- Populated dynamically by initPersonalCorner() in main.js -->
+        </div>
       </div>
     </div>
 
@@ -92,12 +120,13 @@
           </div>
         </div>
 
-        <!-- Category group toggles -->
-        <div id="group-filters" class="absolute bottom-14 left-3 right-3 flex flex-wrap gap-1.5 z-40 pointer-events-auto max-h-24 overflow-y-auto"></div>
-
-        <!-- Premium status hint (now relative to map area) -->
-        <div class="absolute bottom-4 left-4 px-4 py-1.5 text-xs rounded-3xl bg-[#0a0d1a]/80 border border-white/10 text-white/60 backdrop-blur-sm pointer-events-none">
-          Hover nodes for preview • Click for details • Drag to pan • Toggle groups below
+        <!-- Bottom bar: Node Limit slider (top row) + horizontally-scrollable group filter chips (bottom row).
+             Uses aaa-panel for the same custom thin amber scrollbar on the filters row when content overflows horizontally. -->
+        <div id="bottom-controls"
+             class="absolute bottom-0 left-0 right-0 z-[55] pointer-events-auto flex flex-col gap-0.5 px-2 py-1 text-[10px] border-t border-white/10 bg-[#05070f]/95 backdrop-blur">
+          <div id="node-limit-control" class="flex items-center gap-2 text-[10px]"></div>
+          <div id="group-filters"
+               class="flex items-center gap-1 overflow-x-auto whitespace-nowrap px-0.5 py-0.5"></div>
         </div>
       </div>
     </div>

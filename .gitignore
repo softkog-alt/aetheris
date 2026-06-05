@@ -45,3 +45,9 @@ coverage/
 # Misc
 *.tsbuildinfo
 *.tgz
+
+# Editor / session state
+*.sdr
+*.sdr/
+README.sdr/
+UPGRADEME.sdr/
