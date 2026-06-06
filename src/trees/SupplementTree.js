@@ -21,6 +21,69 @@ export class SupplementTree extends BaseTree {
   /** Safety margin on body ellipse so nodes never clip the silhouette. */
   static BODY_MARGIN = 1.12;
 
+  // PNG layered body (GitHub issue #2).
+  // We are keeping the PNG version (user preference over the old vector drawing).
+  static USE_PNG_BODY = true;
+
+  // =====================================================
+  // TUNING SECTION — PNG body & organ registration (issue #2)
+  // =====================================================
+  // Body bases (~360x780) and individual organ PNGs need their own scales + small offsets
+  // because each asset was authored at slightly different "visual weights".
+  //
+  // dx / dy are in the original *design units* (the numbers like 85, 26, 92, 78 etc. in _getOrganPositions).
+  // Small values (±2 to ±8) usually move things the right amount.
+  //
+  // Edit these, save, and hard-reload the dev server page (or use the console toggle + draw()).
+
+  static PNG_BODY_CONFIG = {
+    scale: 0.25,
+    vOffset: -0.03,   // fraction of body height, negative moves the PNG up relative to torso center
+    dx: 0,            // design units
+    dy: 0,
+  };
+
+  // Per-organ overrides. Anything not listed here uses scale: 1.0 relative to the global PNG_ORGAN_DRAW_SCALE.
+  static PNG_ORGAN_CONFIG = {
+    // Core anatomical
+    brain:   { scale: 1.2,  dx: 0, dy: -4 },
+    eyes:    { scale: 0.85, dx: 6, dy: 0 },
+    thyroid: { scale: 0.75, dx: 0, dy: 1 },
+    lungs:   { scale: 1.5, dx: 14, dy: -10 },   // single asset for both sides
+    heart:   { scale: 0.9, dx: -3, dy: -10 },
+    liver:   { scale: 1.0,  dx: 7, dy: -13 },
+    stomach: { scale: 1.2, dx: 3, dy: -15 },
+    gut:     { scale: 1.2, dx: -1, dy: -8 },
+    mito:    { scale: 0.72, dx: 20, dy: 10 },
+    nerves:  { scale: 1.0,  dx: 0, dy: 0 },
+
+    // Add more here as you create additional PNGs (immune, bones, joints, muscle accents, etc.)
+    // immune: { scale: 1.0, dx: 0, dy: 0 },
+  };
+
+  // Global fallback scales (used when no per-organ override exists)
+  static PNG_ORGAN_DRAW_SCALE = 0.4;
+
+  // Debug: draw small red crosses at every organ anchor so you can see exact registration points while tuning.
+  static PNG_DEBUG_ANCHORS = false;
+
+  // -----------------------------------------------------
+  // Selection / pop behavior (makes highlighted organs stand out like the old vector version)
+  // When a node is selected, its organs get full brightness + glow. Everything else recedes.
+  // -----------------------------------------------------
+  static PNG_IDLE_ALPHA_NO_SELECTION = 0.78;     // how visible organs are when nothing is selected
+  static PNG_IDLE_ALPHA_WITH_SELECTION = 0.22;   // non-selected organs when something is highlighted (lower = more pop for the chosen ones)
+  static PNG_ACTIVE_ALPHA = 1.0;
+
+  // Dim the body silhouette itself a little when an organ is active (helps the glowing organs stand out)
+  static PNG_BODY_ALPHA_WITH_SELECTION = 0.82;
+
+  // Glow tuning
+  static PNG_GLOW_CIRCULAR = true;               // keep the soft round energy halo in addition to shaped glow?
+  static PNG_GLOW_SHAPED_STRENGTH = 0.48;        // opacity of the shaped bloom layer
+  static PNG_GLOW_SHAPED_BLUR = 22;              // how soft the shaped glow is (higher = more dispersed)
+  static PNG_GLOW_SHAPED_ENLARGE = 1.13;         // draw the glow pass slightly bigger than the PNG for nice bloom
+
   constructor(canvas, options = {}) {
     super(canvas, options);
     this.data = [];
@@ -64,6 +127,11 @@ export class SupplementTree extends BaseTree {
       'muscle', 'joints', 'bones',
       'mito', 'thyroid'
     ];
+
+    // PNG body assets (issue #2). Populated by _loadBodyAssets().
+    this.bodyImages = { base: {}, organs: {} };
+    this._bodyPngReady = false;
+    this._loadBodyAssets();
   }
 
   loadData(supplementsArray) {
@@ -211,7 +279,7 @@ export class SupplementTree extends BaseTree {
       eyes:    { x: wx(79), y: wy(25) },
       nerves:  { x: wx(85), y: wy(55) },
       heart:   { x: wx(92), y: wy(78) },  // anatomical left (screen right) to match corrected body draw
-      lungs:   { x: wx(71), y: wy(68) },  // anatomical right lung (larger, screen left)
+      lungs:   { x: wx(70), y: wy(68) },  // anatomical right lung (larger, screen left)
       liver:   { x: wx(72), y: wy(92) },  // anatomical right (screen left) to match corrected body draw
       gut:     { x: wx(85), y: wy(112) },
       immune:  { x: wx(85), y: wy(100) },
@@ -229,6 +297,53 @@ export class SupplementTree extends BaseTree {
       vices:      { x: wx(72), y: wy(75) },
       productivity: { x: wx(85), y: wy(45) }
     };
+  }
+
+  _getCurrentGender() {
+    try {
+      const p = (window.AETHERIS && window.AETHERIS.personal) || {};
+      const g = String(p.gender || '').toLowerCase().trim();
+      if (g === 'female') return 'female';
+      // 'male', 'other', or unset -> male base (androgynous stylized figure still reads well)
+      return 'male';
+    } catch (e) {
+      return 'male';
+    }
+  }
+
+  _loadBodyAssets() {
+    const base = '/assets/body';
+    const pending = [];
+
+    // Body bases (gender aware)
+    ['male', 'female'].forEach((g) => {
+      const img = new Image();
+      img.src = `${base}/base/body-${g}.png`;
+      pending.push(new Promise((resolve) => {
+        img.onload = () => { this.bodyImages.base[g] = img; resolve(); };
+        img.onerror = () => { resolve(); }; // graceful: just won't draw that gender
+      }));
+    });
+
+    // Available organs from the provided assets (90%+ of the requested set)
+    // We have: brain, eyes, gut, heart, liver, lungs (single), mito, nerves, stomach, thyroid
+    const organKeys = ['brain', 'eyes', 'gut', 'heart', 'liver', 'lungs', 'mito', 'nerves', 'stomach', 'thyroid'];
+    organKeys.forEach((key) => {
+      const img = new Image();
+      img.src = `${base}/organs/${key}.png`;
+      pending.push(new Promise((resolve) => {
+        img.onload = () => { this.bodyImages.organs[key] = img; resolve(); };
+        img.onerror = () => { resolve(); };
+      }));
+    });
+
+    Promise.all(pending).then(() => {
+      this._bodyPngReady = true;
+      // One redraw once assets are hot (so first paint after load shows the PNG body)
+      if (this.canvas && typeof this.draw === 'function') {
+        requestAnimationFrame(() => this.draw());
+      }
+    });
   }
 
   /** Ellipse radius along a ray from body center (matches scaled silhouette). */
@@ -532,7 +647,24 @@ export class SupplementTree extends BaseTree {
     const selectedNodeForBody = this.selectedId ? visibleNodes.find(n => n.id === this.selectedId) || null : null;
     const highlightOrgs = selectedNodeForBody ? (selectedNodeForBody.organs || []) : [];
     const isNegativeImpact = !!(selectedNodeForBody && (selectedNodeForBody.impact === 'negative' || selectedNodeForBody._isNegative));
-    this._drawCentralBody(ctx, 0, 0, 3.15, highlightOrgs, isNegativeImpact);
+
+    // Issue #2 PNG body (preferred). Vector version kept only for comparison.
+    if (SupplementTree.USE_PNG_BODY && this._bodyPngReady) {
+      this._drawCentralBodyPng(ctx, 0, 0, 3.15, highlightOrgs, isNegativeImpact);
+    } else {
+      this._drawCentralBodyVector(ctx, 0, 0, 3.15, highlightOrgs, isNegativeImpact);
+    }
+
+    // Dev helper: window.AETHERIS.togglePngBody() to flip and redraw instantly
+    if (!window.AETHERIS || !window.AETHERIS._pngToggleInstalled) {
+      const api = window.AETHERIS = window.AETHERIS || {};
+      api.togglePngBody = () => {
+        SupplementTree.USE_PNG_BODY = !SupplementTree.USE_PNG_BODY;
+        console.log('[AETHERIS] PNG body =', SupplementTree.USE_PNG_BODY);
+        if (api.tree && typeof api.tree.draw === 'function') api.tree.draw();
+      };
+      api._pngToggleInstalled = true;
+    }
 
     visibleNodes.forEach(node => {
       // visibleNodes already respects enabled groups + maxNodes limit; no extra filter needed
@@ -700,22 +832,11 @@ export class SupplementTree extends BaseTree {
   }
 
   /**
-   * Premium body silhouette + organs (canvas). Matches organColors; highlights on selection.
-   * Optimized: Set for active checks (O(1)), path reuse (trace once for torso/heart/legs/nerves),
-   * precomputed hasXXX flags, closed-over vars in helpers.
-   * Anatomically corrected + more realistic shapes (detailed paths for brain, heart, lungs (lobes + fissures),
-   * liver (lobed), stomach (sac), intestines (coils), thyroid (butterfly)).
-   *
-   * Why vector paths instead of PNG images for "actual" organ shapes?
-   * - Matches the existing abstract/stylized celestial vector aesthetic (silhouette is pure paths + gradients/glows).
-   * - Perfect scalability with the map's pan/zoom (no pixelation on retina or high zoom).
-   * - Dynamic theming: organColors, per-frame active glows, shadows, alpha, internal fold lines all trivial.
-   * - No asset loading, no bundle bloat, no CORS/preload issues, works offline.
-   * - Easy to keep in sync with the (optional) SVG OrganDiagram for parity.
-   * PNGs would be better only for photorealistic medical viz (with baked lighting + separate highlight layers or filters);
-   * here they would fight the UI style and add complexity for tinting/highlighting during selection.
+   * Original vector body (preserved as fallback).
+   * See GitHub issue #2 for the PNG layered replacement.
+   * To force vector mode at runtime: SupplementTree.USE_PNG_BODY = false; then tree.draw();
    */
-  _drawCentralBody(ctx, cx, cy, s, highlightOrgs = [], isNegative = false) {
+  _drawCentralBodyVector(ctx, cx, cy, s, highlightOrgs = [], isNegative = false) {
     // Use a Set for O(1) lookups instead of calling .includes() repeatedly on an array
     const active = new Set(highlightOrgs);
     
@@ -1208,6 +1329,241 @@ export class SupplementTree extends BaseTree {
         ctx.globalAlpha = isActive ? 0.9 : 0.4;
         ctx.beginPath();
         ctx.arc(x, y, (isActive ? 3.2 : 2.6) * s, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      });
+
+    ctx.restore();
+  }
+
+  /**
+   * PNG-based layered body + organs (GitHub issue #2).
+   * - Gender-aware base from Personal Corner (male/female).
+   * - Individual organ PNGs with transparent bg, drawn in z-order.
+   * - Reuses the existing _drawOrganGlow + highlightOrgs + isNegative logic.
+   * - Keeps cheap vector accents (ambient halo, spine, arms/legs strokes, joints) on top for polish.
+   * - The old full vector implementation lives untouched as _drawCentralBodyVector.
+   *
+   * All tuning lives in PNG_BODY_CONFIG + PNG_ORGAN_CONFIG at the top of the class.
+   * Set USE_PNG_BODY=false then call tree.draw() (or use window.AETHERIS.togglePngBody()) to compare.
+   */
+  _drawCentralBodyPng(ctx, cx, cy, s, highlightOrgs = [], isNegative = false) {
+    const active = new Set(highlightOrgs);
+    const hasSelection = active.size > 0;
+
+    const hx = (x) => cx + (x - 85) * s;
+    const hy = (y) => cy + (y - 100) * s;
+    const organCol = (key) => this.organColors[key] || '#d4af37';
+    const getHighlightColor = (key) => (isNegative && active.has(key)) ? '#ef4444' : organCol(key);
+
+    ctx.save();
+
+    const coreX = hx(85);
+    const coreY = hy(95);
+
+    // Ambient halo (cheap + pretty, keep from the old aesthetic)
+    const amb = ctx.createRadialGradient(coreX, coreY, 8 * s, coreX, coreY, 130 * s);
+    amb.addColorStop(0, active.has('skin') ? 'rgba(251, 191, 36, 0.14)' : 'rgba(103, 232, 249, 0.07)');
+    amb.addColorStop(0.45, 'rgba(167, 139, 250, 0.05)');
+    amb.addColorStop(1, 'transparent');
+    ctx.fillStyle = amb;
+    ctx.beginPath();
+    ctx.arc(coreX, coreY, 130 * s, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw the gender-appropriate body base silhouette.
+    // The PNGs (≈360x780) include head + torso + limbs.
+    const gender = this._getCurrentGender();
+    const bodyImg = this.bodyImages.base[gender] || this.bodyImages.base.male;
+    if (bodyImg && bodyImg.complete && bodyImg.naturalWidth > 10) {
+      const cfg = SupplementTree.PNG_BODY_CONFIG || {};
+      const imgW = bodyImg.naturalWidth;
+      const imgH = bodyImg.naturalHeight;
+      const bScale = (cfg.scale ?? 0.25) * s;
+      const dw = imgW * bScale;
+      const dh = imgH * bScale;
+      const bx = coreX + ((cfg.dx ?? 0) * s);
+      const by = coreY + ((cfg.dy ?? 0) * s) - dh * (0.48 + (cfg.vOffset ?? -0.03));
+
+      // When something is selected, dim the body a bit so the glowing organs pop more
+      if (hasSelection) {
+        ctx.globalAlpha = SupplementTree.PNG_BODY_ALPHA_WITH_SELECTION ?? 0.82;
+      }
+      ctx.drawImage(bodyImg, bx - dw / 2, by, dw, dh);
+      ctx.globalAlpha = 1.0;
+    }
+
+    // Organ layer z-order (back to front). We only draw what we actually loaded.
+    // Anchors come from the same _getOrganPositions() the nodes use, so registration should be close.
+    const anchors = (typeof this._getOrganPositions === 'function') ? this._getOrganPositions() : {};
+    const organDrawOrder = [
+      'lungs',     // behind heart/liver
+      'liver',
+      'stomach',   // upper gut
+      'gut',       // lower coils (we have both assets)
+      'heart',
+      'mito',      // energy orb near heart
+      'nerves',    // overlay lines
+      'thyroid',
+      'brain',
+      'eyes'
+    ];
+
+    const globalOrganScale = SupplementTree.PNG_ORGAN_DRAW_SCALE;
+    const organCfg = SupplementTree.PNG_ORGAN_CONFIG || {};
+
+    for (const key of organDrawOrder) {
+      let img = this.bodyImages.organs[key];
+      if (!img || !img.complete || img.naturalWidth < 10) continue;
+
+      // Position in the current transformed world (anchors are already * BODY_SCALE)
+      const anchor = anchors[key] || { x: 0, y: 0 };
+      const cfg = organCfg[key] || {};
+
+      // dx/dy are in design units (the 85/26/92 etc. numbers), then multiplied by s
+      const ax = anchor.x + ((cfg.dx ?? 0) * s);
+      const ay = anchor.y + ((cfg.dy ?? 0) * s);
+
+      const thisScale = globalOrganScale * (cfg.scale ?? 1.0);
+
+      const isAct = active.has(key);
+      const col = getHighlightColor(key);
+
+      const ow = img.naturalWidth * thisScale;
+      const oh = img.naturalHeight * thisScale;
+
+      if (isAct) {
+        // --- Shaped glow that follows the PNG's actual outline (the important part) ---
+        // We draw the image itself with a shadow. The browser's shadow respects the PNG alpha,
+        // so the glow takes on the real shape of the organ instead of a round blob.
+        const shapedBlur = SupplementTree.PNG_GLOW_SHAPED_BLUR ?? 22;
+        const shapedAlpha = SupplementTree.PNG_GLOW_SHAPED_STRENGTH ?? 0.48;
+        const enlarge = SupplementTree.PNG_GLOW_SHAPED_ENLARGE ?? 1.12;
+
+        ctx.save();
+        ctx.shadowColor = col;
+        ctx.shadowBlur = shapedBlur;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.globalAlpha = shapedAlpha;
+
+        const gw = ow * enlarge;
+        const gh = oh * enlarge;
+        ctx.drawImage(img, ax - gw / 2, ay - gh / 2, gw, gh);
+        ctx.restore();
+
+        // Optional classic round "energy" halo on top of the shaped one (toggleable)
+        if (SupplementTree.PNG_GLOW_CIRCULAR) {
+          const glowR = Math.max(ow, oh) * 0.38;
+          this._drawOrganGlow(ctx, ax, ay, glowR, col, true);
+        }
+      }
+
+      // The actual organ PNG.
+      // When something is selected, non-active organs become quite transparent so the highlighted
+      // ones (and their shaped glow) really stand out — similar to how the old vector organs behaved.
+      const idleAlpha = hasSelection
+        ? (SupplementTree.PNG_IDLE_ALPHA_WITH_SELECTION ?? 0.22)
+        : (SupplementTree.PNG_IDLE_ALPHA_NO_SELECTION ?? 0.78);
+
+      ctx.globalAlpha = isAct
+        ? (SupplementTree.PNG_ACTIVE_ALPHA ?? 1.0)
+        : idleAlpha;
+
+      ctx.drawImage(img, ax - ow / 2, ay - oh / 2, ow, oh);
+      ctx.globalAlpha = 1.0;
+    }
+
+    // Optional debug anchors (super useful while tuning scales/offsets)
+    if (SupplementTree.PNG_DEBUG_ANCHORS) {
+      ctx.fillStyle = '#ff0000';
+      ctx.strokeStyle = '#ff0000';
+      ctx.lineWidth = 1;
+      Object.entries(anchors).forEach(([k, a]) => {
+        const x = a.x;
+        const y = a.y;
+        ctx.beginPath();
+        ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y);
+        ctx.moveTo(x, y - 6); ctx.lineTo(x, y + 6);
+        ctx.stroke();
+        ctx.fillText(k, x + 8, y - 4);
+      });
+    }
+
+    // Fallback for organs we don't have PNGs for yet (e.g. immune)
+    if (active.has('immune') || (!this.bodyImages.organs.immune && active.has('immune'))) {
+      // Use the lightweight ellipse helper the old code already had for immune
+      this._drawOrganEllipse(ctx, hx, hy, 85, 58, 5, 4, s, getHighlightColor('immune'), active.has('immune'), 0.28);
+    }
+
+    // Keep a few cheap vector structural accents on top of the PNG body.
+    // These give nice "active" feedback on limbs/spine without requiring extra PNGs.
+    // (The body bases already provide the main silhouette + limbs.)
+
+    // Spine (subtle)
+    const spineActive = active.has('bones') || active.has('joints');
+    ctx.strokeStyle = spineActive ? '#e2e8f0' : '#475569';
+    ctx.lineWidth = (spineActive ? 2.0 : 1.1) * s;
+    ctx.globalAlpha = spineActive ? 0.6 : (hasSelection ? 0.12 : 0.25);
+    ctx.beginPath();
+    ctx.moveTo(hx(85), hy(40));
+    ctx.lineTo(hx(85), hy(120));
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Arms (muscle)
+    const muscleCol = getHighlightColor('muscle');
+    const hasMuscle = active.has('muscle');
+    const drawArm = (x1, y1, cx1, cy1, x2, y2) => {
+      ctx.strokeStyle = hasMuscle ? muscleCol : '#3d4a5c';
+      ctx.lineWidth = (hasMuscle ? 4.8 : 3.6) * s;
+      ctx.lineCap = 'round';
+      ctx.globalAlpha = hasMuscle ? 0.85 : (hasSelection ? 0.18 : 0.35);
+      if (hasMuscle) {
+        ctx.shadowBlur = 7 * s;
+        ctx.shadowColor = muscleCol;
+      }
+      ctx.beginPath();
+      ctx.moveTo(hx(x1), hy(y1));
+      ctx.quadraticCurveTo(hx(cx1), hy(cy1), hx(x2), hy(y2));
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    };
+    drawArm(68, 58, 52, 78, 55, 115);
+    drawArm(102, 58, 118, 78, 115, 115);
+
+    // Legs (bones)
+    const hasBones = active.has('bones');
+    const bonesActiveColor = (isNegative && hasBones) ? '#ef4444' : '#e2e8f0';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = hasBones ? bonesActiveColor : '#3d4a5c';
+    ctx.lineWidth = (hasBones ? 4.2 : 3.4) * s;
+    ctx.globalAlpha = hasBones ? 0.55 : (hasSelection ? 0.14 : 0.28);
+    ctx.beginPath();
+    ctx.moveTo(hx(77), hy(123));
+    ctx.quadraticCurveTo(hx(71), hy(155), hx(74), hy(177));
+    ctx.moveTo(hx(93), hy(123));
+    ctx.quadraticCurveTo(hx(99), hy(155), hx(96), hy(177));
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Joint markers (shoulders + knees) — small colored dots when relevant
+    const jointCol = getHighlightColor('joints');
+    const boneCol = getHighlightColor('bones');
+    const hasJoints = active.has('joints');
+    [[68, 55, jointCol, hasJoints],
+     [102, 55, jointCol, hasJoints],
+     [74, 153, boneCol, hasBones || hasJoints],
+     [96, 153, boneCol, hasBones || hasJoints]]
+      .forEach(([sx, sy, color, isAct]) => {
+        const x = hx(sx);
+        const y = hy(sy);
+        if (isAct) this._drawOrganGlow(ctx, x, y, 4.5 * s, color, true);
+        ctx.fillStyle = isAct ? color : '#3d4a5c';
+        ctx.globalAlpha = isAct ? 0.85 : (hasSelection ? 0.16 : 0.32);
+        ctx.beginPath();
+        ctx.arc(x, y, (isAct ? 2.8 : 2.2) * s, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1;
       });
