@@ -16,6 +16,8 @@ import { ExerciseTree } from "./trees/ExerciseTree.js";
 import { FoodsTree } from "./trees/FoodsTree.js";
 import { HoverPopup } from "./components/HoverPopup.js";
 import { ExplorerModal } from "./components/ExplorerModal.js";
+import { BottomSheet } from "./components/BottomSheet.js";
+import { personalizedScore } from "./core/ScoringEngine.js";
 
 // Import Tailwind + custom styles (processed by Vite)
 import './style.css';
@@ -60,14 +62,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const detailPanel = document.getElementById("detail-panel");
 
+  function isMobileViewport() {
+    // Used to decide: left inspector panel (desktop) vs smart bottom sheet (mobile, Issue #1)
+    return window.innerWidth < 768 || (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
+  }
+
   // === Initialize Components ===
   const hoverPopup = new HoverPopup().init();
   const explorerModal = new ExplorerModal().init();
+  const bottomSheet = new BottomSheet().init();
 
   // Expose globally for inline onclick handlers in the HTML
   window.AETHERIS = {
     popup: hoverPopup,
     modal: explorerModal,
+    bottomSheet: bottomSheet,
     tree: treeInstance,
     ORGAN_META: organMeta,
     currentConstellation: 'supplements',
@@ -82,6 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     currentTreeType = type;
     hoverPopup.hide();
+    if (window.AETHERIS?.bottomSheet) window.AETHERIS.bottomSheet.close(true);
 
     if (treeInstance) {
       treeInstance.dispose();
@@ -165,6 +175,8 @@ document.addEventListener("DOMContentLoaded", () => {
     allBtn.className = 'group-chip px-2.5 py-1 text-[10px] rounded-xl border border-amber-400/50 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25 transition font-semibold tracking-wide';
     allBtn.textContent = 'ALL';
     allBtn.onclick = () => {
+      // #4 / UPGRADEME 1.2: toggleAllGroups (implemented in SupplementTree) turns ALL off when everything is already on.
+      // This gives the expected "click All again to clear" quick-reset UX. Falls back only for older tree classes.
       if (typeof treeInstance.toggleAllGroups === 'function') {
         treeInstance.toggleAllGroups();
       } else {
@@ -433,15 +445,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const fake = { clientX: t.clientX, clientY: t.clientY };
       const { x: mx, y: my } = canvasPointer(fake);
       const hit = treeInstance.getNodeAt(mx, my);
-      if (hit) {
-        hoverPopup.hide();
-        treeInstance.select(hit.id);
-        updateDetail(hit);
-      } else {
-        treeInstance.reset();
-        updateDetail(null);
-        hoverPopup.hide();
-      }
+      handleNodeSelection(hit || null);
+      if (!hit) hoverPopup.hide();
     }
   }, { passive: false });
 
@@ -470,13 +475,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Mark initial active state
   updateConstellationButtons('supplements');
 
-  function updateDetail(node) {
-    if (!detailPanel) return;
-    if (!node) {
-      const label = currentTreeType === 'habits' ? 'habits' : (currentTreeType === 'exercises' ? 'exercises' : (currentTreeType === 'foods' ? 'foods' : 'supplements'));
-      detailPanel.innerHTML = `<div class="text-white/60">Select a node on the ${label} map</div>`;
-      return;
-    }
+  // Shared inspector renderer used by BOTH the desktop left panel AND the mobile bottom sheet (Issue #1).
+  // Keeps all the rich content (mechanisms, personal impact, clickable organs, share, risks, "Read full", etc.) in one place.
+  function populateInspector(container, node) {
+    if (!container || !node) return;
 
     const isNegative = (node.impact === 'negative' || node._isNegative);
     const scoreLabel = isNegative ? 'Harm / Damage' : 'Longevity';
@@ -484,8 +486,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const overallColor = isNegative ? 'text-red-300' : 'text-amber-300';
     const supportsLabel = isNegative ? 'Damages / Negative Impact On' : 'Supports';
 
-    // Richer inspector content (7.1): mechanisms + study + timing/bestForms + dosage in place.
-    // "Read more" keeps full Gorkipedia in modal (6.4 spirit: inspector is now primary).
     let extraInfo = '';
     const mechs = (node.mechanisms || []).slice(0, 3);
     if (mechs.length) {
@@ -521,7 +521,6 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>`;
     }
 
-    // Organ chips now clickable for benefit explanations (6.2) — leverages mechanisms + static hints, no node schema changes.
     const organChips = (node.organs || []).map(key => {
       const meta = organMeta[key];
       if (!meta) return '';
@@ -529,7 +528,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return `<button data-organ="${key}" class="organ-chip px-2 py-0.5 text-[10px] rounded-full border hover:scale-[1.02] active:scale-[0.98] transition" style="border-color:${col}44; background:${col}11; color:${col}">${meta.label}</button>`;
     }).join('');
 
-    detailPanel.innerHTML = `
+    container.innerHTML = `
       <div class="text-left w-full">
         <div class="text-2xl font-semibold title-font tracking-tight ${isNegative ? 'text-red-300' : ''}">${node.name}</div>
         <div class="text-xs uppercase tracking-widest ${isNegative ? 'text-red-400' : 'text-amber-400'} mt-1">${node.cat.toUpperCase()} • ${node.short} ${isNegative ? '• HARMFUL' : ''}</div>
@@ -540,7 +539,51 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="bg-[#0a0d1a] p-2 rounded-xl">Overall <span class="font-mono ${overallColor}">${node.vitality}</span></div>
         </div>
 
+        ${(() => {
+          const p = personalData || {};
+          const hasAny = Object.keys(p).some(k => p[k] !== '' && p[k] != null);
+          if (isNegative || node.impact === 'negative' || !hasAny) return '';
+          try {
+            const ps = typeof personalizedScore === 'function' ? personalizedScore(node, p) : 0;
+            if (ps) return `<div class="mt-1"><span class="inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 font-mono">${ps} <span class="font-sans text-emerald-300/70">personal match</span></span></div>`;
+          } catch(e){}
+          return '';
+        })()}
+
         <div class="mt-3 text-xs text-white/80 leading-snug">${node.blurb}</div>
+
+        ${(() => {
+          const p = personalData || {};
+          const hasAny = Object.keys(p).some(k => p[k] !== '' && p[k] != null);
+          if (isNegative || node.impact === 'negative') return '';
+          try {
+            const ps = typeof personalizedScore === 'function' ? personalizedScore(node, p) : null;
+            if (hasAny && ps) {
+              const reasons = [];
+              const age = parseInt(p.age,10)||0;
+              const sys = parseInt(p.systolic,10)||0;
+              const dia = parseInt(p.diastolic,10)||0;
+              const slp = (p.sleep||'').toLowerCase();
+              const mood = (p.mood||'').toLowerCase();
+              const dig = (p.digestion||'').toLowerCase();
+              const push = parseInt(p.pushups,10)||0;
+              const orgs = (node.organs||[]).map(o=>o.toLowerCase());
+              if ((sys>130||dia>85) && (orgs.includes('heart')||orgs.includes('mito'))) reasons.push('your BP profile');
+              if ((slp==='poor'||slp==='fair') && (orgs.includes('brain')||/magnes|taurine/.test((node.name||'').toLowerCase()))) reasons.push('sleep quality');
+              if (age>50 && (orgs.includes('muscle')||orgs.includes('bones')||/creat|vit d/i.test(node.name||''))) reasons.push('age + muscle support');
+              if (mood==='low' && orgs.includes('brain')) reasons.push('mood/energy markers');
+              if (dig==='poor' && orgs.includes('gut')) reasons.push('digestion notes');
+              const why = reasons.length ? reasons.join(' + ') : 'profile alignment';
+              return `<div class="mt-2 p-2 rounded-xl bg-emerald-950/30 border border-emerald-400/30 text-[10px]">
+                <div class="uppercase tracking-widest text-emerald-300/80 mb-0.5 flex items-center gap-1"><span class="font-mono text-emerald-300">${ps}</span> MATCH FOR YOU</div>
+                <div class="text-white/80">Impact on <span class="text-emerald-200">YOUR</span> build: strong fit via ${why}. ${node.short || ''} aligns with your entered metrics.</div>
+              </div>`;
+            } else if (!hasAny) {
+              return `<div class="mt-2 text-[10px] px-2 py-1 rounded-xl border border-emerald-400/30 bg-emerald-400/5 text-emerald-300/90 popup-blink">Enter your stats in Personal Corner for a personalized match score &amp; impact notes on this node.</div>`;
+            }
+          } catch(e){}
+          return '';
+        })()}
 
         ${isNegative && node.risks && !node.highDoseRisks ? `
         <div class="mt-3 p-2 rounded-xl bg-red-950/40 border border-red-500/30">
@@ -569,9 +612,9 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
     `;
 
-    // Organ click handlers (6.2) — derive explanation from mechanisms + hints (no node edits)
-    const organsWrap = detailPanel.querySelector('#inspector-organs');
-    const benefitBox = detailPanel.querySelector('#inspector-organ-benefit');
+    // Organ benefit explanations (6.2)
+    const organsWrap = container.querySelector('#inspector-organs');
+    const benefitBox = container.querySelector('#inspector-organ-benefit');
     const organHintMap = {
       brain: 'Supports cognition, neuroprotection & mood via BDNF, membrane fluidity, reduced inflammation, and neurotransmitter balance.',
       heart: 'Cardioprotective: improves endothelial function, lipid profiles, mitochondrial efficiency in cardiac muscle.',
@@ -586,7 +629,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     if (organsWrap && benefitBox) {
       organsWrap.querySelectorAll('.organ-chip').forEach(chip => {
-        chip.onclick = (e) => {
+        chip.onclick = () => {
           const key = chip.dataset.organ;
           const meta = organMeta[key];
           const hint = organHintMap[key] || 'Key longevity organ system targeted by this molecule.';
@@ -597,15 +640,12 @@ document.addEventListener("DOMContentLoaded", () => {
           }).slice(0,2);
           benefitBox.innerHTML = `<span class="font-semibold text-[10px] text-white/60">${meta ? meta.label : key.toUpperCase()}:</span> ${hint} ${relMechs.length ? '<div class="mt-1 text-white/60">Via: ' + relMechs.join(' • ') + '</div>' : ''}`;
           benefitBox.classList.remove('hidden');
-          // one-click closes
           benefitBox.onclick = () => benefitBox.classList.add('hidden');
         };
       });
     }
 
-    // (Body highlight handled in canvas)
-
-    const explorerBtn = detailPanel.querySelector('#open-explorer-btn');
+    const explorerBtn = container.querySelector('#open-explorer-btn');
     if (explorerBtn) {
       explorerBtn.onclick = () => {
         if (window.AETHERIS?.modal) {
@@ -617,8 +657,7 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    // Share (8.1)
-    const shareBtn = detailPanel.querySelector('#share-btn');
+    const shareBtn = container.querySelector('#share-btn');
     if (shareBtn) {
       shareBtn.onclick = () => {
         const txt = `${node.name} scores ${node.vitality || node.longevity} on AETHERIS. ${node.blurb || ''} aetheris.app 🧬`;
@@ -628,18 +667,58 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    // External links (7.3) — ONLY to Gorkipedia article on the subject.
-    // Nodes should provide `url` (e.g. "https://grokipedia.app/creatine-monohydrate"); fallback uses id.
-    const extBtn = detailPanel.querySelector('#ext-link-btn');
+    const extBtn = container.querySelector('#ext-link-btn');
     if (extBtn) {
       extBtn.onclick = () => {
         const grokUrl = node.url || node.grokipediaUrl || `https://grokipedia.app/${node.id}`;
         window.open(grokUrl, '_blank');
       };
-      // Update title to reflect Gorkipedia-only
       extBtn.title = 'View Gorkipedia article';
     }
   }
+
+  // Desktop path kept for wide screens. Mobile routes to bottom sheet instead.
+  function updateDetail(node) {
+    if (!detailPanel) return;
+    if (!node) {
+      const label = currentTreeType === 'habits' ? 'habits' : (currentTreeType === 'exercises' ? 'exercises' : (currentTreeType === 'foods' ? 'foods' : 'supplements'));
+      detailPanel.innerHTML = `<div class="text-white/60">Select a node on the ${label} map</div>`;
+      return;
+    }
+    populateInspector(detailPanel, node);
+  }
+
+  // Unified selection handler: routes to bottom sheet (preview → expand) on mobile,
+  // or classic left inspector on desktop. Also handles background taps (close + reset).
+  function handleNodeSelection(node) {
+    const mobile = isMobileViewport();
+    const bs = window.AETHERIS && window.AETHERIS.bottomSheet;
+
+    if (node) {
+      hoverPopup.hide();
+      if (treeInstance) treeInstance.select(node.id);
+
+      if (mobile && bs) {
+        const same = bs.getCurrentNodeId() === node.id;
+        if (same && bs.getMode() === 'preview') {
+          bs.expand();
+        } else {
+          bs.showPreview(node);
+        }
+      } else {
+        updateDetail(node);
+      }
+    } else {
+      if (treeInstance) treeInstance.reset();
+      if (bs) bs.close();
+      updateDetail(null);
+    }
+  }
+
+  // Expose the shared renderer so BottomSheet (and future components) can render the exact same rich inspector.
+  window.AETHERIS = window.AETHERIS || {};
+  window.AETHERIS.populateInspector = populateInspector;
+  window.AETHERIS.isMobileViewport = isMobileViewport;
 
   // =====================================================
   // 3.1 PERSONAL CORNER — Collapsible personalization section under inspector
@@ -656,6 +735,8 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) {
       personalData = {};
     }
+    // Ensure global is populated early so trees can read gender for PNG body on first draw
+    if (window.AETHERIS) window.AETHERIS.personal = { ...personalData };
   }
 
   function savePersonalData() {
@@ -732,7 +813,14 @@ document.addEventListener("DOMContentLoaded", () => {
       personalData[key] = value;
     }
     savePersonalData();
+    // Keep the global exposure fresh (used by trees for gender-aware body etc.)
+    if (window.AETHERIS) window.AETHERIS.personal = { ...personalData };
     renderPersonalPanel(); // live update insights
+
+    // Issue #2: gender (or other profile) change should immediately affect the layered body PNG
+    if (treeInstance && typeof treeInstance.draw === 'function') {
+      treeInstance.draw();
+    }
   }
 
   function renderPersonalPanel() {
@@ -791,11 +879,11 @@ document.addEventListener("DOMContentLoaded", () => {
     html += `
       <div class="col-span-2">
         <div class="text-white/40 mb-0.5">Blood Pressure (mmHg)</div>
-        <div class="flex gap-2">
-          <input type="number" class="flex-1 bg-[#0a0d1a] border border-white/15 rounded-xl px-2 py-1 text-white/90 text-xs" 
-                 value="${p.systolic || ''}" placeholder="Sys" data-key="systolic" />
-          <input type="number" class="flex-1 bg-[#0a0d1a] border border-white/15 rounded-xl px-2 py-1 text-white/90 text-xs" 
-                 value="${p.diastolic || ''}" placeholder="Dia" data-key="diastolic" />
+        <div class="flex flex-col gap-1">
+          <input type="number" class="w-full bg-[#0a0d1a] border border-white/15 rounded-xl px-2 py-1 text-white/90 text-xs" 
+                 value="${p.systolic || ''}" placeholder="Systolic" data-key="systolic" />
+          <input type="number" class="w-full bg-[#0a0d1a] border border-white/15 rounded-xl px-2 py-1 text-white/90 text-xs" 
+                 value="${p.diastolic || ''}" placeholder="Diastolic" data-key="diastolic" />
         </div>
       </div>`;
 
@@ -950,6 +1038,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AETHERIS = window.AETHERIS || {};
     window.AETHERIS.personal = personalData;
     window.AETHERIS.getPersonalInsights = getPersonalInsights;
+    window.AETHERIS.personalizedScore = (n) => (typeof personalizedScore === 'function' ? personalizedScore(n, personalData) : null);
   }
 
   // Call init after other UI setup
@@ -980,7 +1069,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (hit) {
       canvas.style.cursor = "pointer";
-      hoverPopup.show(hit, e.clientX, e.clientY);
+      if (!isMobileViewport()) hoverPopup.show(hit, e.clientX, e.clientY);
     } else {
       canvas.style.cursor = "crosshair";
       hoverPopup.hide();
@@ -1000,15 +1089,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const { x: mx, y: my } = canvasPointer(e);
     const hit = treeInstance.getNodeAt(mx, my);
 
-    if (hit) {
-      hoverPopup.hide();
-      treeInstance.select(hit.id);
-      updateDetail(hit);
-    } else {
-      treeInstance.reset();
-      updateDetail(null);
-      hoverPopup.hide();
-    }
+    handleNodeSelection(hit || null);
+    if (!hit) hoverPopup.hide();
   });
 
   // === Keyboard shortcuts (polish + power user delight) ===
@@ -1016,8 +1098,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!treeInstance) return;
     if (e.key === 'Escape') {
       hoverPopup.hide();
-      treeInstance.reset();
-      updateDetail(null);
+      handleNodeSelection(null);
     } else if (e.key === '+' || e.key === '=') {
       treeInstance.zoom(1);
     } else if (e.key === '-' || e.key === '_') {
@@ -1038,9 +1119,20 @@ document.addEventListener("DOMContentLoaded", () => {
     if (currentTreeType !== 'supplements' || !treeInstance) return;
     const omega = treeInstance.nodes.find(n => n.id === 'omega3');
     if (!omega) return;
-    treeInstance.select('omega3');
-    updateDetail(omega);
+    handleNodeSelection(omega);
   }, 400);
+
+  // On resize, if we cross from mobile to desktop, close any open bottom sheet so the left inspector becomes visible.
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const bs = window.AETHERIS && window.AETHERIS.bottomSheet;
+      if (bs && bs.getMode() !== 'closed' && !isMobileViewport()) {
+        bs.close(true);
+      }
+    }, 120);
+  });
 
   console.log("%c[AETHERIS Modular] Supplements tree + components initialized successfully.", "color:#4ade80");
 });
