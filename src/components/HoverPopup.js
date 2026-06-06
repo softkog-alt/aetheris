@@ -1,6 +1,9 @@
 /**
  * HoverPopup — minimal floating card on node hover (read-only).
+ * Now includes green personalized match score badge when personal data is present (#7 / 4.1).
  */
+
+import { personalizedScore } from "../core/ScoringEngine.js";
 
 export class HoverPopup {
   constructor() {
@@ -21,9 +24,12 @@ export class HoverPopup {
 
     this.currentId = node.id;
 
-    // Always clear any stale high-dose notes before building new content
+    // Always clear any stale high-dose notes and personal score badges before building new content
+    // This prevents spam / multiple "XX match for you" badges on repeated mousemove hovers
     const oldNotes = this.el.querySelectorAll('.popup-high-dose-note');
     oldNotes.forEach(n => n.remove());
+    const oldScores = this.el.querySelectorAll('.popup-personal-score');
+    oldScores.forEach(n => n.remove());
 
     const pad = 16;
     const cardW = 260;
@@ -64,6 +70,25 @@ export class HoverPopup {
       });
     }
 
+    // Green personalized match score badge (if we have any personal data) (#7)
+    const p = (window.AETHERIS && window.AETHERIS.personal) || {};
+    const hasPersonal = Object.keys(p).some(k => p[k] !== '' && p[k] != null);
+    if (hasPersonal && !(node.impact === 'negative' || node._isNegative)) {
+      try {
+        const ps = personalizedScore(node, p);
+        if (ps && ps > 0) {
+          const scoreBadge = document.createElement('div');
+          scoreBadge.className = 'mt-1.5 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 popup-personal-score';
+          scoreBadge.innerHTML = `<span class="font-mono">${ps}</span><span class="uppercase tracking-widest text-[9px] text-emerald-300/70">match for you</span>`;
+          if (organsEl && organsEl.parentNode) {
+            organsEl.parentNode.appendChild(scoreBadge);
+          } else if (blurbEl && blurbEl.parentNode) {
+            blurbEl.parentNode.appendChild(scoreBadge);
+          }
+        }
+      } catch (e) { /* non-fatal */ }
+    }
+
     // Subtle note for high dose risk supps (referenced on map hover)
     const hasHighDose = !!(node.highDoseRisks);
     const isNegHover = !!(node.impact === 'negative' || node._isNegative);
@@ -74,14 +99,24 @@ export class HoverPopup {
       organsEl.parentNode.appendChild(note);
     }
 
+    // Make visible so we can measure real height (extra badges / content can make it taller than the old 140px assumption)
     this.el.style.display = 'block';
     this.el.classList.remove('hidden');
+
+    // Re-adjust top after content is inserted to avoid extending past the bottom of the screen
+    const pad2 = 12;
+    const measuredH = this.el.offsetHeight || 160;
+    const desiredTop = Math.max(pad2, Math.min(clientY - 16, window.innerHeight - measuredH - pad2));
+    this.el.style.top = desiredTop + 'px';
   }
 
   hide() {
     if (this.el) {
       this.el.style.display = 'none';
       this.el.classList.add('hidden');
+      // Clean up dynamic badges so they don't linger if popup is reused
+      const oldNotes = this.el.querySelectorAll('.popup-high-dose-note, .popup-personal-score');
+      oldNotes.forEach(n => n.remove());
     }
     this.currentId = null;
   }

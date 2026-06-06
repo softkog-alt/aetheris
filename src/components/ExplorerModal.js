@@ -56,6 +56,23 @@ export class ExplorerModal {
       <div class="bg-[#0a0d1a] px-3 py-1.5 rounded-2xl border border-white/10">${cLabel} <span class="font-mono ${isNeg ? 'text-red-400' : 'text-emerald-400'}">${node.diseases}</span></div>
     `;
 
+    // Green personal match badge in modal (consistent with inspector/hover, #7)
+    if (!isNeg && (node.impact !== 'negative')) {
+      const p = (window.AETHERIS && window.AETHERIS.personal) || {};
+      const hasP = Object.keys(p).some(k => p[k] !== '' && p[k] != null);
+      if (hasP && window.AETHERIS && typeof window.AETHERIS.personalizedScore === 'function') {
+        try {
+          const ps = window.AETHERIS.personalizedScore(node);
+          if (ps) {
+            const psBadge = document.createElement('div');
+            psBadge.className = 'mt-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 inline-flex items-center gap-1';
+            psBadge.innerHTML = `<span class="font-mono">${ps}</span> <span class="uppercase tracking-widest text-[9px]">personal match</span>`;
+            glance.parentElement.appendChild(psBadge);
+          }
+        } catch(e){}
+      }
+    }
+
     // Organs (clickable for benefit explanations, 6.2 + 7.1)
     const orgEl = document.getElementById('modal-organs');
     orgEl.innerHTML = '';
