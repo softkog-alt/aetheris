@@ -10,10 +10,12 @@ import { supplements, categories, organMeta } from "./data/supplements.js";
 import { habits, habitCategories } from "./data/habits.js";
 import { exercises, exerciseCategories } from "./data/exercises.js";
 import { foods, foodCategories } from "./data/foods.js";
+import { environment, environmentCategories } from "./data/environment.js";
 import { SupplementTree } from "./trees/SupplementTree.js";
 import { HabitsTree } from "./trees/HabitsTree.js";
 import { ExerciseTree } from "./trees/ExerciseTree.js";
 import { FoodsTree } from "./trees/FoodsTree.js";
+import { EnvironmentTree } from "./trees/EnvironmentTree.js";
 import { HoverPopup } from "./components/HoverPopup.js";
 import { ExplorerModal } from "./components/ExplorerModal.js";
 import { BottomSheet } from "./components/BottomSheet.js";
@@ -109,6 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const isSupplements = type === 'supplements';
     const isExercises = type === 'exercises';
     const isFoods = type === 'foods';
+    const isEnvironment = type === 'environment';
 
     // Create the right tree class
     if (isSupplements) {
@@ -129,6 +132,12 @@ document.addEventListener("DOMContentLoaded", () => {
       treeInstance.loadData(foods);
       validateTreeData(foods, 'foods');
       window.AETHERIS.categories = foodCategories;
+    } else if (isEnvironment) {
+      treeInstance = new EnvironmentTree(canvas);
+      bindTreeViewport(treeInstance);
+      treeInstance.loadData(environment);
+      validateTreeData(environment, 'environment');
+      window.AETHERIS.categories = environmentCategories;
     } else {
       treeInstance = new HabitsTree(canvas);
       bindTreeViewport(treeInstance);
@@ -152,7 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Clear detail panel
     if (detailPanel) {
-      const label = isFoods ? 'foods' : (isExercises ? 'exercises' : (isSupplements ? 'supplements' : 'habits'));
+      const label = isEnvironment ? 'environment' : (isFoods ? 'foods' : (isExercises ? 'exercises' : (isSupplements ? 'supplements' : 'habits')));
       detailPanel.innerHTML = `<div class="text-white/60">Select a node on the ${label} map</div>`;
     }
 
@@ -166,10 +175,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const habBtn = document.getElementById('btn-constellation-habits');
     const exBtn = document.getElementById('btn-constellation-exercises');
     const foodBtn = document.getElementById('btn-constellation-foods');
+    const envBtn = document.getElementById('btn-constellation-environment');
     if (supBtn) supBtn.classList.toggle('active', activeType === 'supplements');
     if (habBtn) habBtn.classList.toggle('active', activeType === 'habits');
     if (exBtn) exBtn.classList.toggle('active', activeType === 'exercises');
     if (foodBtn) foodBtn.classList.toggle('active', activeType === 'foods');
+    if (envBtn) envBtn.classList.toggle('active', activeType === 'environment');
   }
 
   function renderGroupFilters() {
@@ -582,11 +593,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const habBtn = document.getElementById('btn-constellation-habits');
   const exBtn = document.getElementById('btn-constellation-exercises');
   const foodBtn = document.getElementById('btn-constellation-foods');
+  const envBtn = document.getElementById('btn-constellation-environment');
 
   if (supBtn) supBtn.onclick = () => switchConstellation('supplements');
   if (habBtn) habBtn.onclick = () => switchConstellation('habits');
   if (exBtn) exBtn.onclick = () => switchConstellation('exercises');
   if (foodBtn) foodBtn.onclick = () => switchConstellation('foods');
+  if (envBtn) envBtn.onclick = () => switchConstellation('environment');
 
   // Mark initial active state
   updateConstellationButtons('supplements');
@@ -671,6 +684,12 @@ document.addEventListener("DOMContentLoaded", () => {
         })()}
 
         <div class="mt-3 text-xs text-white/80 leading-snug">${node.blurb}</div>
+
+        ${isNegative && (node.avoidance || node.mitigation) ? `
+          <div class="mt-2">
+            ${node.avoidance ? `<div class="text-[10px] uppercase tracking-widest text-red-400/70 mb-0.5">AVOID / REDUCE</div><div class="text-[10px] text-red-200/90">${node.avoidance}</div>` : ''}
+            ${node.mitigation ? `<div class="mt-1 text-[10px] uppercase tracking-widest text-amber-400/70 mb-0.5">MITIGATION SUPPORT</div><div class="text-[10px] text-amber-200/90">${node.mitigation}</div>` : ''}
+          </div>` : ''}
 
         ${(() => {
           const p = personalData || {};
@@ -801,7 +820,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateDetail(node) {
     if (!detailPanel) return;
     if (!node) {
-      const label = currentTreeType === 'habits' ? 'habits' : (currentTreeType === 'exercises' ? 'exercises' : (currentTreeType === 'foods' ? 'foods' : 'supplements'));
+      const label = currentTreeType === 'environment' ? 'environment' : (currentTreeType === 'habits' ? 'habits' : (currentTreeType === 'exercises' ? 'exercises' : (currentTreeType === 'foods' ? 'foods' : 'supplements')));
       detailPanel.innerHTML = `<div class="text-white/60">Select a node on the ${label} map</div>`;
       return;
     }
