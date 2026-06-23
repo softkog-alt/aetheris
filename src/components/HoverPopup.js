@@ -79,7 +79,13 @@ export class HoverPopup {
         if (ps && ps > 0) {
           const scoreBadge = document.createElement('div');
           scoreBadge.className = 'mt-1.5 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 popup-personal-score';
-          scoreBadge.innerHTML = `<span class="font-mono">${ps}</span><span class="uppercase tracking-widest text-[9px] text-emerald-300/70">match for you</span>`;
+          scoreBadge.title = `Personalized score based on your profile (age, BP, sleep, exercise, mood, digestion). Higher = better match for you.`;
+          let barColor = ps >= 70 ? 'bg-emerald-400' : (ps >= 50 ? 'bg-yellow-400' : 'bg-slate-400');
+          scoreBadge.innerHTML = `
+            <span class="font-mono font-bold">${ps}</span>
+            <span class="uppercase tracking-widest text-[9px]">personal score</span>
+            <div class="w-8 h-1.5 bg-white/20 rounded ml-1 overflow-hidden"><div class="${barColor} h-full" style="width:${ps}%"></div></div>
+          `;
           if (organsEl && organsEl.parentNode) {
             organsEl.parentNode.appendChild(scoreBadge);
           } else if (blurbEl && blurbEl.parentNode) {

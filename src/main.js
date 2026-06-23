@@ -691,7 +691,14 @@ document.addEventListener("DOMContentLoaded", () => {
           if (isNegative || node.impact === 'negative' || node._isBlood || !hasAny) return '';
           try {
             const ps = typeof personalizedScore === 'function' ? personalizedScore(node, p) : 0;
-            if (ps) return `<div class="mt-1"><span class="inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 font-mono">${ps} <span class="font-sans text-emerald-300/70">personal match</span></span></div>`;
+            if (ps) {
+              const barColor = ps >= 70 ? 'bg-emerald-400' : (ps >= 50 ? 'bg-yellow-400' : 'bg-slate-400');
+              return `<div class="mt-2 p-2 rounded-xl bg-emerald-950/40 border border-emerald-400/40 text-sm flex items-center gap-2" title="Green Personalized Score (0-100): how beneficial this is specifically for YOU based on your profile.">
+                <span class="font-mono text-lg text-emerald-300">${ps}</span>
+                <span class="uppercase tracking-widest text-emerald-300/80 text-xs">personal score</span>
+                <div class="flex-1 h-2 bg-white/10 rounded overflow-hidden"><div class="${barColor} h-full" style="width:${ps}%"></div></div>
+              </div>`;
+            }
           } catch(e){}
           return '';
         })()}
@@ -734,7 +741,6 @@ document.addEventListener("DOMContentLoaded", () => {
               if (dig==='poor' && orgs.includes('gut')) reasons.push('digestion notes');
               const why = reasons.length ? reasons.join(' + ') : 'profile alignment';
               return `<div class="mt-2 p-2 rounded-xl bg-emerald-950/30 border border-emerald-400/30 text-[10px]">
-                <div class="uppercase tracking-widest text-emerald-300/80 mb-0.5 flex items-center gap-1"><span class="font-mono text-emerald-300">${ps}</span> MATCH FOR YOU</div>
                 <div class="text-white/80">Impact on <span class="text-emerald-200">YOUR</span> build: strong fit via ${why}. ${node.short || ''} aligns with your entered metrics.</div>
               </div>`;
             } else if (!hasAny) {
@@ -819,7 +825,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const shareBtn = container.querySelector('#share-btn');
     if (shareBtn) {
       shareBtn.onclick = () => {
-        const txt = `${node.name} scores ${node.vitality || node.longevity} on AETHERIS. ${node.blurb || ''} aetheris.app 🧬`;
+        const isEnv = node._isEnvironment || node.cat && ['air-pollution','heavy-metals'].includes(node.cat);
+        const prefix = isEnv ? 'Avoid exposure to' : (node._isBlood ? 'Track biomarker' : node.name + ' scores');
+        const score = node.vitality || node.longevity || node.current || '';
+        const txt = `${prefix} ${node.name} ${score ? '— ' + score : ''} on AETHERIS. ${node.blurb ? node.blurb.slice(0,120) : ''} aetheris.app 🧬`;
         navigator.clipboard?.writeText(txt).catch(()=>{});
         const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(txt)}`;
         window.open(xUrl, '_blank', 'width=560,height=420');
@@ -829,10 +838,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const extBtn = container.querySelector('#ext-link-btn');
     if (extBtn) {
       extBtn.onclick = () => {
-        const grokUrl = node.url || node.grokipediaUrl || `https://grokipedia.app/${node.id}`;
-        window.open(grokUrl, '_blank');
+        // #10: Deep links to actual Gorkipedia or best authoritative fallback
+        let url = node.grokipediaUrl || node.url;
+        if (!url) {
+          if (node.gorkipedia) {
+            url = `https://grokipedia.app/${encodeURIComponent(node.id)}`;
+          } else {
+            // Fallbacks per #10
+            url = `https://examine.com/search/?q=${encodeURIComponent(node.name)}`;
+          }
+        }
+        window.open(url, '_blank');
       };
-      extBtn.title = 'View Gorkipedia article';
+      extBtn.innerHTML = 'Read full monograph ↗';
+      extBtn.title = 'Open Gorkipedia (or Examine fallback) for full details';
     }
   }
 
@@ -1163,6 +1182,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const header = document.getElementById('personal-header');
     const collapseBtn = document.getElementById('personal-collapse-btn');
     if (!panel || !header) return;
+
+    // #6 simple first-time onboarding for Personal Corner
+    const seen = localStorage.getItem('aetheris-personal-onboarded');
+    const hasData = Object.keys(personalData || {}).some(k => personalData[k] !== '' && personalData[k] != null);
+    if (!seen && !hasData) {
+      const note = document.createElement('div');
+      note.className = 'mt-2 p-2 text-[10px] bg-emerald-900/30 border border-emerald-400/30 rounded-xl text-emerald-200/90';
+      note.innerHTML = 'Welcome! Enter your stats below for personalized scores &amp; insights across all constellations. All data stays in your browser.';
+      panel.insertBefore(note, panel.firstChild);
+      localStorage.setItem('aetheris-personal-onboarded', '1');
+      // auto clear after interaction
+      setTimeout(() => { if (note.parentNode) note.parentNode.removeChild(note); }, 8000);
+    }
 
     // Start open (not collapsed) so the form/inputs are immediately visible and not "empty".
     // User can click the header to collapse the details if desired. (Still fully collapsible.)

@@ -560,7 +560,12 @@ export class SupplementTree extends BaseTree {
         const idSpread = ((node.id?.length || 0) * 0.019 + (node.id?.charCodeAt(0) || 0) * 0.0008) % 0.12 - 0.06;
         const fan = (t - 0.5) * spread + idSpread;
         const ang = sectorAng + fan;
-        const orbitDist = this._calcOrbitDistance(edge, node, group);
+        let orbitDist = this._calcOrbitDistance(edge, node, group);
+
+        // Strictly enforce rank-based proximity: highest vitality (i=0) gets minimal orbit (closest to organ)
+        // Lower rank get pushed outward. This fulfills #5 rank proximity enforcement.
+        const rankFactor = 0.6 + (t * 0.7);  // 0.6 for top, up to ~1.3 for lowest
+        orbitDist = orbitDist * rankFactor;
 
         node.x = Math.cos(ang) * orbitDist;
         node.y = Math.sin(ang) * orbitDist * 0.82;

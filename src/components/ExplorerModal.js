@@ -56,7 +56,7 @@ export class ExplorerModal {
       <div class="bg-[#0a0d1a] px-3 py-1.5 rounded-2xl border border-white/10">${cLabel} <span class="font-mono ${isNeg ? 'text-red-400' : 'text-emerald-400'}">${node.diseases}</span></div>
     `;
 
-    // Green personal match badge in modal (consistent with inspector/hover, #7)
+    // Green personal match badge in modal (consistent with inspector/hover, #7) - prominent
     if (!isNeg && (node.impact !== 'negative')) {
       const p = (window.AETHERIS && window.AETHERIS.personal) || {};
       const hasP = Object.keys(p).some(k => p[k] !== '' && p[k] != null);
@@ -65,8 +65,10 @@ export class ExplorerModal {
           const ps = window.AETHERIS.personalizedScore(node);
           if (ps) {
             const psBadge = document.createElement('div');
-            psBadge.className = 'mt-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 inline-flex items-center gap-1';
-            psBadge.innerHTML = `<span class="font-mono">${ps}</span> <span class="uppercase tracking-widest text-[9px]">personal match</span>`;
+            psBadge.className = 'mt-2 text-xs px-2 py-1 rounded-xl bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 inline-flex items-center gap-2';
+            psBadge.title = 'Personalized Score (0-100): how well this node matches your profile (age, BP, sleep, etc.). Updates live with Personal Corner.';
+            let barColor = ps >= 70 ? 'bg-emerald-400' : (ps >= 50 ? 'bg-yellow-400' : 'bg-slate-400');
+            psBadge.innerHTML = `<span class="font-mono font-semibold text-sm">${ps}</span> <span class="uppercase tracking-[1px] text-[9px]">personal score</span> <div class="w-10 h-1.5 bg-white/20 rounded overflow-hidden"><div class="${barColor} h-full" style="width:${Math.max(5,ps)}%"></div></div>`;
             glance.parentElement.appendChild(psBadge);
           }
         } catch(e){}
@@ -221,10 +223,13 @@ export class ExplorerModal {
     if (extBtn) {
       extBtn.onclick = () => {
         // Only point to Gorkipedia article (7.3). Prefer explicit node.url on the entry; fallback by id.
-        const grokUrl = node.url || node.grokipediaUrl || `https://grokipedia.app/${node.id}`;
-        window.open(grokUrl, '_blank');
+        // #10 deep links
+        let url = node.grokipediaUrl || node.url;
+        if (!url && node.gorkipedia) url = `https://grokipedia.app/${encodeURIComponent(node.id)}`;
+        if (!url) url = `https://examine.com/search/?q=${encodeURIComponent(node.name)}`;
+        window.open(url, '_blank');
       };
-      extBtn.textContent = 'Gorkipedia ↗';
+      extBtn.textContent = 'Read full on Gorkipedia ↗';
     }
 
     // Expanded inspector details (new fields for richer inspector)
