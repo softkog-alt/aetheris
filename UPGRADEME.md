@@ -13,6 +13,7 @@ fixed
 **File:** `src/main.js` — `renderGroupFilters()` & `SupplementTree.enableAllGroups()`
 - **Problem:** The `ALL` chip currently calls `treeInstance.enableAllGroups()` unconditionally. When every category is already enabled, clicking `ALL` should toggle them *all off* for quick reset.
 - **Fix:** Check `if (all currently enabled) -> disable all` else `enable all`. Update chip sync accordingly.
+- **Status:** ✅ Implemented + verified (toggleAllGroups + chip styles + 'f' key; see issue #4 comments).
 
 ---
 
@@ -272,8 +273,9 @@ export const dataMeta = {
 
 ## 12. Other Quick Wins
 
-- **Keyboard `f` behavior:** currently forces `enableAllGroups`; make it toggle on/off.
-- **Touch/mobile:** add touch-drag pan and pinch-zoom for mobile devices.
+- **Keyboard `f` behavior:** currently forces `enableAllGroups`; make it toggle on/off. ✅ (uses toggleAllGroups)
+- **Touch/mobile:** add touch-drag pan and pinch-zoom for mobile devices. ✅ (unified pointer events + inertia)
+- **Canvas panning perf (GitHub #12):** RAF batching, pointer events unification, inertia/momentum. ✅ Implemented 2026-06.
 - **Node collision density:** with 100+ food nodes, the `_settleNodePositions` iterations may need dynamic scaling to prevent slow frames.
 - **Social meta tags:** add Open Graph / Twitter Card meta tags in `index.html` so shared links render rich cards.
 - **Data validation:** Add runtime schema validation (Zod or lightweight checks) when loading `supplements.js` and other tree data to catch missing/inconsistent fields early.

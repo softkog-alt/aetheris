@@ -163,7 +163,15 @@ export class ExplorerModal {
     });
 
     // Dosage + Risks (deduped highDoseRisks into unified Safety Profile below)
-    document.getElementById('modal-dosage').innerHTML = `<span class="text-white/60">Typical:</span> ${node.dosage || 'Consult clinical guidance'}`;
+    const dosageEl = document.getElementById('modal-dosage');
+    dosageEl.innerHTML = `<span class="text-white/60">Typical:</span> ${node.dosage || 'Consult clinical guidance'}`;
+    if (node.dosage && !(node.impact === 'negative' || node._isNegative)) {
+      const bar = document.createElement('div');
+      bar.className = 'mt-2';
+      bar.innerHTML = `<div class="h-1.5 w-full rounded bg-white/10 overflow-hidden flex"><span class="h-1.5 w-[18%] bg-emerald-400/60" title="Min effective"></span><span class="h-1.5 w-[45%] bg-emerald-300" title="Optimal zone"></span><span class="h-1.5 w-[20%] bg-amber-400/70" title="Megadose"></span><span class="h-1.5 flex-1 bg-red-500/50" title="Caution"></span></div>
+        <div class="flex text-[8px] text-white/50 mt-0.5 justify-between"><span>min</span><span class="text-emerald-300">opt</span><span>high</span><span class="text-red-300/70">risk</span></div>`;
+      dosageEl.appendChild(bar);
+    }
     let risksHtml = node.risks ? `<i class="fa-solid fa-exclamation-triangle mr-1"></i>${node.risks}` : (isNeg ? '<span class="text-red-300/80">Documented negative effects — see mechanisms.</span>' : '');
     document.getElementById('modal-risks').innerHTML = risksHtml || '<span class="text-white/40">Generally well-tolerated at standard doses.</span>';
 

@@ -90,6 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (type === currentTreeType) return;
 
     currentTreeType = type;
+    stopInertia();
     hoverPopup.hide();
     if (window.AETHERIS?.bottomSheet) window.AETHERIS.bottomSheet.close(true);
 
@@ -246,9 +247,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnZoomOut = document.getElementById('btn-zoom-out');
     const btnRecenter = document.getElementById('btn-recenter');
 
-    if (btnZoomIn) btnZoomIn.onclick = () => treeInstance && treeInstance.zoom(1);
-    if (btnZoomOut) btnZoomOut.onclick = () => treeInstance && treeInstance.zoom(-1);
-    if (btnRecenter) btnRecenter.onclick = () => treeInstance && treeInstance.recenter();
+    if (btnZoomIn) btnZoomIn.onclick = () => { stopInertia && stopInertia(); treeInstance && treeInstance.zoom(1); };
+    if (btnZoomOut) btnZoomOut.onclick = () => { stopInertia && stopInertia(); treeInstance && treeInstance.zoom(-1); };
+    if (btnRecenter) btnRecenter.onclick = () => { stopInertia && stopInertia(); treeInstance && treeInstance.recenter(); };
   }
 
   // Node Limit slider (UPGRADE 2.1): top N by vitality (in bottom bar above filters).
@@ -346,115 +347,144 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // === Map Interaction (Pan + Zoom) ===
+  // === Map Interaction (Pan + Zoom) - unified pointer events + RAF + inertia (GitHub #12) ===
   const DRAG_THRESHOLD = 5;
   let pointerDown = false;
   let isPanning = false;
   let suppressNextClick = false;
   let downX = 0, downY = 0;
   let lastX = 0, lastY = 0;
+  let activePointerId = null;
 
-  canvas.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
+  // Inertia state (issue #12)
+  let lastPanDx = 0;
+  let lastPanDy = 0;
+  let inertiaId = null;
+
+  function stopInertia() {
+    if (inertiaId) {
+      cancelAnimationFrame(inertiaId);
+      inertiaId = null;
+    }
+    lastPanDx = 0;
+    lastPanDy = 0;
+  }
+
+  function startInertia(vx, vy) {
+    stopInertia();
+    let curVx = vx * 1.4;
+    let curVy = vy * 1.4;
+    const friction = 0.90;
+    const minVel = 0.25;
+    const step = () => {
+      if (Math.abs(curVx) < minVel && Math.abs(curVy) < minVel) {
+        inertiaId = null;
+        return;
+      }
+      if (treeInstance && (Math.abs(curVx) > 0.1 || Math.abs(curVy) > 0.1)) {
+        treeInstance.pan(curVx, curVy);
+      }
+      curVx *= friction;
+      curVy *= friction;
+      inertiaId = requestAnimationFrame(step);
+    };
+    inertiaId = requestAnimationFrame(step);
+  }
+
+  // Pointer Events (unifies mouse + touch, addresses perf #12)
+  canvas.style.touchAction = 'none';
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!treeInstance) return;
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    activePointerId = e.pointerId;
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    stopInertia();
     pointerDown = true;
     isPanning = false;
     downX = lastX = e.clientX;
     downY = lastY = e.clientY;
+    lastPanDx = 0;
+    lastPanDy = 0;
+    if (e.pointerType !== 'mouse') {
+      // mobile-ish: hide hover immediately
+      hoverPopup.hide();
+    }
   });
 
-  window.addEventListener('mouseup', () => {
-    if (isPanning) suppressNextClick = true;
-    pointerDown = false;
-    isPanning = false;
-    canvas.style.cursor = 'grab';
-  });
-
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    treeInstance.zoom(e.deltaY);
-  }, { passive: false });
-
-  // === Touch support: drag pan + pinch-zoom (12 quick win) ===
-  let touchStartDist = 0;
-  let lastTouchX = 0, lastTouchY = 0;
-  let touchCount = 0;
-
-  function getTouchDist(e) {
-    if (e.touches.length < 2) return 0;
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    return Math.hypot(dx, dy);
-  }
-
-  canvas.addEventListener('touchstart', (e) => {
-    if (!treeInstance) return;
-    e.preventDefault();
-    touchCount = e.touches.length;
-    pointerDown = true;
-    isPanning = false;
-    if (touchCount === 1) {
-      downX = lastX = lastTouchX = e.touches[0].clientX;
-      downY = lastY = lastTouchY = e.touches[0].clientY;
-    } else if (touchCount === 2) {
-      touchStartDist = getTouchDist(e);
-      lastTouchX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      lastTouchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    }
-  }, { passive: false });
-
-  canvas.addEventListener('touchmove', (e) => {
-    if (!treeInstance || !pointerDown) return;
-    e.preventDefault();
-    if (e.touches.length === 2 && touchStartDist > 10) {
-      // Pinch zoom
-      const newDist = getTouchDist(e);
-      const factor = newDist / touchStartDist;
-      // Map factor to zoom steps (tree.zoom expects deltaY-like sign/magnitude)
-      const zoomAmt = (factor > 1 ? -1 : 1) * Math.min(60, Math.abs(Math.log(factor) * 80));
-      treeInstance.zoom(zoomAmt);
-      touchStartDist = newDist; // continuous
-      return;
-    }
-    // Single touch pan
-    const tx = e.touches[0].clientX;
-    const ty = e.touches[0].clientY;
-    const moved = Math.hypot(tx - downX, ty - downY);
+  window.addEventListener('pointermove', (e) => {
+    if (!treeInstance || !pointerDown || (activePointerId !== null && e.pointerId !== activePointerId)) return;
+    const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
     if (!isPanning && moved > DRAG_THRESHOLD) {
       isPanning = true;
       hoverPopup.hide();
+      canvas.style.cursor = 'grabbing';
     }
     if (isPanning) {
-      treeInstance.pan(tx - lastTouchX, ty - lastTouchY);
-      lastTouchX = tx;
-      lastTouchY = ty;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      treeInstance.pan(dx, dy);
+      lastPanDx = dx;
+      lastPanDy = dy;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      return; // panning overrides hover
     }
-  }, { passive: false });
 
-  canvas.addEventListener('touchend', (e) => {
-    if (!treeInstance) return;
+    // Hover logic (non-pan)
+    const { x: mx, y: my } = canvasPointer(e);
+    const hit = treeInstance.getNodeAt(mx, my);
+    treeInstance.setHover(hit ? hit.id : null);
+    if (hit) {
+      canvas.style.cursor = "pointer";
+      if (!isMobileViewport()) hoverPopup.show(hit, e.clientX, e.clientY);
+    } else {
+      canvas.style.cursor = "crosshair";
+      hoverPopup.hide();
+    }
+  });
+
+  function endPointer(e) {
+    if (activePointerId !== null && e && e.pointerId !== activePointerId) return;
     const wasPanning = isPanning;
     if (wasPanning) suppressNextClick = true;
+    if (wasPanning && (Math.abs(lastPanDx) > 1 || Math.abs(lastPanDy) > 1)) {
+      startInertia(lastPanDx, lastPanDy);
+    }
     pointerDown = false;
     isPanning = false;
-    touchStartDist = 0;
-    touchCount = 0;
+    activePointerId = null;
+    try { if (e && e.pointerId) canvas.releasePointerCapture(e.pointerId); } catch (_) {}
     canvas.style.cursor = 'grab';
-    // If it was a tap (no pan), treat as click on release
-    if (!wasPanning && e.changedTouches && e.changedTouches.length) {
-      const t = e.changedTouches[0];
-      const fake = { clientX: t.clientX, clientY: t.clientY };
+    lastPanDx = 0;
+    lastPanDy = 0;
+    // Tap-to-select for touch/pen when not panned
+    if (!wasPanning && e && (e.pointerType === 'touch' || e.pointerType === 'pen') && e.clientX != null) {
+      const fake = { clientX: e.clientX, clientY: e.clientY };
       const { x: mx, y: my } = canvasPointer(fake);
       const hit = treeInstance.getNodeAt(mx, my);
       handleNodeSelection(hit || null);
       if (!hit) hoverPopup.hide();
     }
+  }
+
+  window.addEventListener('pointerup', endPointer);
+  window.addEventListener('pointercancel', endPointer);
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    stopInertia();
+    treeInstance.zoom(e.deltaY);
   }, { passive: false });
 
-  // Also allow touchcancel to clean state
-  canvas.addEventListener('touchcancel', () => {
+  // Legacy mouseup for safety (some edge cases)
+  window.addEventListener('mouseup', () => {
+    if (!pointerDown) return;
+    // covered by pointerup, but ensure
+    if (isPanning) suppressNextClick = true;
     pointerDown = false;
     isPanning = false;
-    touchStartDist = 0;
+    canvas.style.cursor = 'grab';
   });
 
   rewireMapControls();
@@ -510,6 +540,10 @@ document.addEventListener("DOMContentLoaded", () => {
           ${node.dosage ? `<div class="text-[11px] text-white/85">${node.dosage}</div>` : ''}
           ${node.timing ? `<div class="text-[10px] text-white/60 mt-0.5"><span class="uppercase tracking-widest text-[9px] text-white/45">TIMING:</span> ${node.timing}</div>` : ''}
           ${node.bestForms ? `<div class="text-[10px] text-white/60 mt-0.5"><span class="uppercase tracking-widest text-[9px] text-white/45">BEST FORMS:</span> ${node.bestForms}</div>` : ''}
+          ${node.dosage && !isNegative ? `<div class="mt-1.5">
+            <div class="h-1.5 w-full rounded bg-white/10 overflow-hidden flex"><span class="h-1.5 w-[18%] bg-emerald-400/60" title="Min effective"></span><span class="h-1.5 w-[45%] bg-emerald-300" title="Optimal zone"></span><span class="h-1.5 w-[20%] bg-amber-400/70" title="Megadose"></span><span class="h-1.5 flex-1 bg-red-500/50" title="Caution"></span></div>
+            <div class="flex text-[8px] text-white/50 mt-0.5 justify-between"><span>min</span><span class="text-emerald-300">opt</span><span>high</span><span class="text-red-300/70">risk</span></div>
+          </div>` : ''}
         </div>`;
     }
     if (node.highDoseRisks || (isNegative && node.risks)) {
@@ -1046,36 +1080,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   window.AETHERIS.tree = treeInstance;
 
-  canvas.addEventListener("mousemove", (e) => {
-    if (pointerDown && treeInstance) {
-      const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
-      if (!isPanning && moved > DRAG_THRESHOLD) {
-        isPanning = true;
-        hoverPopup.hide();
-        canvas.style.cursor = 'grabbing';
-      }
-      if (isPanning) {
-        treeInstance.pan(e.clientX - lastX, e.clientY - lastY);
-        lastX = e.clientX;
-        lastY = e.clientY;
-        return;
-      }
-    }
-
-    const { x: mx, y: my } = canvasPointer(e);
-
-    const hit = treeInstance.getNodeAt(mx, my);
-    treeInstance.setHover(hit ? hit.id : null);
-
-    if (hit) {
-      canvas.style.cursor = "pointer";
-      if (!isMobileViewport()) hoverPopup.show(hit, e.clientX, e.clientY);
-    } else {
-      canvas.style.cursor = "crosshair";
-      hoverPopup.hide();
-    }
-  });
-
   canvas.addEventListener("mouseleave", () => {
     hoverPopup.hide();
   });
@@ -1100,8 +1104,10 @@ document.addEventListener("DOMContentLoaded", () => {
       hoverPopup.hide();
       handleNodeSelection(null);
     } else if (e.key === '+' || e.key === '=') {
+      stopInertia && stopInertia();
       treeInstance.zoom(1);
     } else if (e.key === '-' || e.key === '_') {
+      stopInertia && stopInertia();
       treeInstance.zoom(-1);
     } else if (e.key.toLowerCase() === 'r') {
       treeInstance.recenter();

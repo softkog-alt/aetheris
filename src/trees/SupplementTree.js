@@ -99,6 +99,21 @@ export class SupplementTree extends BaseTree {
     /** Active category keys (nodes outside these are hidden + excluded from layout). */
     this.enabledGroups = new Set();
 
+    // Perf (GitHub #12): RAF-batched redraw for smooth pan/zoom
+    this._rafPending = false;
+    this._rafId = null;
+
+    // Fixed screen-space stars for celestial background (normalized coords for natural distribution)
+    // Using deterministic hash instead of modulo for non-grid "starfield" look
+    this._stars = Array.from({ length: 160 }, (_, i) => {
+      const h1 = (i * 9821 + 17) % 100000 / 100000;
+      const h2 = (i * 6923 + 41) % 100000 / 100000;
+      const h3 = (i * 5147 + 99) % 100000 / 100000;
+      const size = (h3 < 0.08) ? 2.1 : (h3 < 0.25 ? 1.3 : 0.7);
+      const alpha = (h3 < 0.06) ? 0.95 : (h3 < 0.22 ? 0.55 : 0.32);
+      return { nx: h1, ny: h2, size, alpha };
+    });
+
     // Premium color palette for organ groups (harmonious with dark celestial theme)
     // Each organ gets a distinct but elegant color for clear visual grouping
     this.organColors = {
@@ -161,8 +176,10 @@ export class SupplementTree extends BaseTree {
   }
 
   _getVisibleNodes() {
+    // size===0 means "all off" (via ALL chip quick-reset / 'f' key) → show no nodes
+    // otherwise filter strictly to enabled groups (initial + manual + ALL-on)
     let vis = (!this.enabledGroups || this.enabledGroups.size === 0)
-      ? this.nodes
+      ? []
       : this.nodes.filter(n => this.enabledGroups.has(n.cat));
 
     if (this.maxNodes > 0 && vis.length > this.maxNodes) {
@@ -616,15 +633,17 @@ export class SupplementTree extends BaseTree {
     ctx.fillStyle = "#05070f";
     ctx.fillRect(0, 0, w, h);
 
-    // Starfield — keep some atmosphere but not too busy
-    for (let i = 0; i < 110; i++) {
-      const sx = ((i * 41 + 13) % (w - 20)) + 10;
-      const sy = ((i * 57 + 9) % (h - 40)) + 10;
-      const size = ((i % 4) === 0) ? 1.6 : 0.6;
-      const alpha = ((i % 5) === 0) ? 0.85 : 0.35;
-      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-      ctx.fillRect(sx, sy, size, size);
+    // Starfield — natural distribution, crisp small dots (GitHub stars fix)
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    for (const s of (this._stars || [])) {
+      const sx = s.nx * w;
+      const sy = s.ny * h;
+      ctx.globalAlpha = s.alpha;
+      const sz = s.size;
+      // floor for crisp + min size 1px logical for visibility across DPRs
+      ctx.fillRect((sx | 0), (sy | 0), Math.max(1, sz), Math.max(1, sz));
     }
+    ctx.globalAlpha = 1;
 
     // Subtle nebula (upper area lighter so focus stays on the central body + nodes)
     const nebula = ctx.createRadialGradient(w * 0.5, h * 0.25, 60, w * 0.5, h * 0.55, 380);
@@ -1613,7 +1632,7 @@ export class SupplementTree extends BaseTree {
     const v = this.view;
     const factor = delta > 0 ? 1.18 : 0.82;
     v.scale = Math.max(0.55, Math.min(2.8, v.scale * factor));
-    this.draw();
+    this._scheduleDraw();
   }
 
   /** Pan map in screen pixels (drag right → view moves right). */
@@ -1624,7 +1643,18 @@ export class SupplementTree extends BaseTree {
     v.panY = (v.panY ?? v.scrollY ?? 0) - dy / s;
     delete v.scrollX;
     delete v.scrollY;
-    this.draw();
+    this._scheduleDraw();
+  }
+
+  /** RAF-batched draw for panning perf (issue #12). Direct draw() remains immediate for clicks/selections. */
+  _scheduleDraw() {
+    if (this._rafPending) return;
+    this._rafPending = true;
+    this._rafId = requestAnimationFrame(() => {
+      this._rafPending = false;
+      this._rafId = null;
+      this.draw();
+    });
   }
 
   scroll(dx) {
@@ -1633,6 +1663,8 @@ export class SupplementTree extends BaseTree {
 
   resetView() {
     this.view = { panX: 0, panY: 0, scale: 0.92 };
+    this._rafPending = false;
+    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
     this.draw();
   }
 
@@ -1642,7 +1674,7 @@ export class SupplementTree extends BaseTree {
     v.panX = node.x || 0;
     v.panY = node.y || 0;
     v.scale = Math.max(v.scale, 1.12);
-    this.draw();
+    this._scheduleDraw();
   }
 
   recenter() {
