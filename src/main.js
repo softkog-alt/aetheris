@@ -184,7 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
     allBtn.className = 'group-chip px-2.5 py-1 text-[10px] rounded-xl border border-amber-400/50 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25 transition font-semibold tracking-wide';
     allBtn.textContent = 'ALL';
     allBtn.onclick = () => {
-      // #4 / UPGRADEME 1.2: toggleAllGroups (implemented in SupplementTree) turns ALL off when everything is already on.
+      // #4: toggleAllGroups (implemented in SupplementTree) turns ALL off when everything is already on.
       // This gives the expected "click All again to clear" quick-reset UX. Falls back only for older tree classes.
       if (typeof treeInstance.toggleAllGroups === 'function') {
         treeInstance.toggleAllGroups();
@@ -553,7 +553,9 @@ document.addEventListener("DOMContentLoaded", () => {
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     stopInertia();
-    treeInstance.zoom(e.deltaY);
+    // Invert deltaY so wheel "down" zooms out, wheel "up" zooms in (standard map behavior).
+    // Buttons/keyboard still use positive=zoom-in via zoom(1).
+    treeInstance.zoom(-e.deltaY);
   }, { passive: false });
 
   // Legacy mouseup for safety (some edge cases)
@@ -841,7 +843,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // =====================================================
   // 3.1 PERSONAL CORNER — Collapsible personalization section under inspector
   // Persisted in localStorage, generates BMI + rule-based supplement recs + risk flags.
-  // All logic client-side per privacy note in UPGRADEME.
+  // All logic client-side (no server upload).
   // =====================================================
   let personalData = {};
   const PERSONAL_STORAGE_KEY = 'aetheris-personal-v1';
@@ -890,7 +892,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const sleep = (p.sleep || '').toLowerCase();
     const push = parseInt(p.pushups, 10) || 0;
 
-    // BP rules (high BP examples from UPGRADEME)
+    // BP rules (high BP examples)
     if (sys > 130 || dia > 85) {
       out.recs.push({ name: 'L-Citrulline', reason: 'Nitric oxide support for endothelial function & BP' });
       out.recs.push({ name: 'Coenzyme Q10', reason: 'Mitochondrial & cardio support for elevated BP' });
