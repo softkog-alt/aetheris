@@ -4,7 +4,7 @@
  * Body-centric layout: the body silhouette is central on the canvas.
  * Nodes are placed near the organs they influence, with the most influential
  * (by vitality) being closest to the organ and rendered largest.
- * Longevity (L), QoL (Q), and overall vitality are shown on every node.
+ * Vitality score (centered) + name + warnings shown on nodes.
  * Central body organ highlights on selection (detail via HoverPopup).
  */
 
@@ -102,7 +102,7 @@ export class SupplementTree extends BaseTree {
     this._rafPending = false;
     this._rafId = null;
 
-    // Panning mode flag for LOD / simplified rendering during drag
+    // Panning mode flag (used to skip expensive body/organ glows during drag for perf)
     this._isPanning = false;
 
     // Fixed screen-space stars for celestial background (normalized coords for natural distribution)
@@ -587,7 +587,7 @@ export class SupplementTree extends BaseTree {
   }
 
   /**
-   * L / Q / vitality in a triangle inside the node (vitality at top).
+   * Draw centered vitality score inside node.
    */
   _drawNodeScore(ctx, node, r, { isDimmed, isSelected, isHighValue }) {
     if (r < 10) return;
@@ -616,8 +616,6 @@ export class SupplementTree extends BaseTree {
     const panX = v.panX ?? v.scrollX ?? 0;
     const panY = v.panY ?? v.scrollY ?? 0;
     const scale = v.scale || 1;
-
-    const isPanning = !!this._isPanning;
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -660,7 +658,9 @@ export class SupplementTree extends BaseTree {
 
     // PNG body is the only version. No toggle.
 
-    // Culling + simplified rendering during panning for smooth 60fps+ on mobile
+    // Culling + unified simplified node rendering (same for panning and static)
+    // Removes shading (inner gradients) + inner circle for optimum mobile perf.
+    // Always shows score (vitality), name, warnings. Selected glow preserved.
     const margin = 60;
     const invScale = 1 / scale;
     const viewHalfW = (w * invScale) / 2;
@@ -681,77 +681,34 @@ export class SupplementTree extends BaseTree {
       const isHighlighted = highlightIds.includes(node.id);
 
       const baseRadius = node.radius || 18;
-      let r = (isSelected || isHovered) && !isPanning ? baseRadius * 1.18 : baseRadius;
+      let r = (isSelected || isHovered) ? baseRadius * 1.18 : baseRadius;
 
       const groupColor = this._getNodeColor(node);
-
-      if (isPanning) {
-        // Ultra fast path for dragging: minimal state changes, no gradients, no shadows, no text
-        ctx.fillStyle = groupColor;
-        ctx.strokeStyle = isSelected || isHighlighted ? "#f4e9c8" : "#ffffff";
-        ctx.lineWidth = 1.5;
-
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        return;
-      }
-
-      // Full quality path (used for hover, click, zoom settle, tree switches)
       const isDimmed = false;
       const isHighValue = node.vitality > 82;
-      const glowColor = groupColor;
 
-      // Glow layers
+      // Unified simplified path (same when scrolling or not): dark fill + ring only.
+      // No shading gradients, no inner circle. Fast + consistent. Selected glows.
       if (isSelected || isHighlighted) {
-        ctx.shadowBlur = 28;
-        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 22;
+        ctx.shadowColor = groupColor;
       } else if (isHovered) {
-        ctx.shadowBlur = 18;
-        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = groupColor;
       } else {
-        ctx.shadowBlur = isHighValue ? 13 : 6;
-        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 0;
       }
 
-      ctx.strokeStyle = isSelected || isHighlighted ? "#d4af37" : (isHighValue ? "#d4af37" : "#67e8f9");
-      ctx.lineWidth = isSelected ? 4.5 : (isHovered ? 3.2 : (isHighValue ? 3.0 : 2.0));
-
-      ctx.fillStyle = isDimmed ? "#1f2437" : "#0f1424";
+      ctx.fillStyle = "#0f1424";
+      ctx.strokeStyle = (isSelected || isHighlighted) ? "#f4e9c8" : groupColor;
+      ctx.lineWidth = isSelected ? 4.2 : (isHovered ? 3.0 : 2.2);
 
       ctx.beginPath();
       ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-
-      // Rich layered inner gradient for depth
-      const grad = ctx.createRadialGradient(
-        node.x - r * 0.32, node.y - r * 0.32, r * 0.12,
-        node.x, node.y, r * 1.08
-      );
-      grad.addColorStop(0, isDimmed ? "#3a3f52" : (isHighValue ? "#3a2f1f" : "#1f2a3f"));
-      grad.addColorStop(0.5, isDimmed ? "#1f2437" : "#0f1424");
-      grad.addColorStop(1, isDimmed ? "#15181f" : "#080b12");
-
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, r - 1.2, 0, Math.PI * 2);
-      ctx.fill();
 
       ctx.shadowBlur = 0;
-
-      ctx.strokeStyle = isSelected || isHighlighted ? "#f4e9c8" : groupColor;
-      ctx.lineWidth = isSelected ? 4.8 : (isHovered ? 3.8 : 2.8);
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = isHighValue ? "rgba(212,175,55,0.75)" : "rgba(255,255,255,0.3)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, r - 5.2, 0, Math.PI * 2);
-      ctx.stroke();
 
       this._drawNodeScore(ctx, node, r, { isDimmed, isSelected, isHighValue });
 

@@ -459,7 +459,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     pointerDown = false;
     isPanning = false;
-    if (treeInstance) treeInstance._isPanning = false;
+    if (treeInstance) {
+      treeInstance._isPanning = false;
+      // Force a draw after pan ends (nodes now use same simplified rendering for scroll/static)
+      if (typeof treeInstance.draw === 'function') treeInstance.draw();
+    }
     activePointerId = null;
     try { if (e && e.pointerId) canvas.releasePointerCapture(e.pointerId); } catch (_) {}
     canvas.style.cursor = 'grab';
