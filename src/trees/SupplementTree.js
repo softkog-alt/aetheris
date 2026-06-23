@@ -22,8 +22,7 @@ export class SupplementTree extends BaseTree {
   static BODY_MARGIN = 1.12;
 
   // PNG layered body (GitHub issue #2).
-  // We are keeping the PNG version (user preference over the old vector drawing).
-  static USE_PNG_BODY = true;
+  // PNG body is the only version.
 
   // =====================================================
   // TUNING SECTION — PNG body & organ registration (issue #2)
@@ -68,7 +67,7 @@ export class SupplementTree extends BaseTree {
   static PNG_DEBUG_ANCHORS = false;
 
   // -----------------------------------------------------
-  // Selection / pop behavior (makes highlighted organs stand out like the old vector version)
+  // Selection / pop behavior (makes highlighted organs stand out)
   // When a node is selected, its organs get full brightness + glow. Everything else recedes.
   // -----------------------------------------------------
   static PNG_IDLE_ALPHA_NO_SELECTION = 0.78;     // how visible organs are when nothing is selected
@@ -590,32 +589,20 @@ export class SupplementTree extends BaseTree {
   /**
    * L / Q / vitality in a triangle inside the node (vitality at top).
    */
-  _drawNodeScoreTriangle(ctx, node, r, { isDimmed, isSelected, isHighValue }) {
+  _drawNodeScore(ctx, node, r, { isDimmed, isSelected, isHighValue }) {
     if (r < 10) return;
 
     const vit = String(node.vitality ?? '');
-    const lLabel = String(node.longevity ?? '');
-    const qLabel = String(node.qol ?? '');
 
     const fsVit = Math.round(Math.max(8, Math.min(13, r * 0.52)));
-    const fsSide = Math.round(Math.max(6, Math.min(10, r * 0.4)));
 
-    const topY = node.y - r * 0.34;
-    const baseY = node.y + r * 0.32;
-    const spreadX = r * 0.38;
-
+    // Centered longevity score (vitality)
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     ctx.font = `${isSelected ? 800 : 700} ${fsVit}px Inter, system-ui, sans-serif`;
     ctx.fillStyle = isDimmed ? '#6b7280' : (isHighValue ? '#f4e9c8' : (isSelected ? '#e0f2fe' : '#a5d8ff'));
-    ctx.fillText(vit, node.x, topY);
-
-    ctx.font = `600 ${fsSide}px Inter, system-ui, sans-serif`;
-    ctx.fillStyle = isDimmed ? '#4b5563' : '#67e8f9';
-    ctx.fillText('L' + lLabel, node.x - spreadX, baseY);
-    ctx.fillStyle = isDimmed ? '#4b5563' : '#c084fc';
-    ctx.fillText('Q' + qLabel, node.x + spreadX, baseY);
+    ctx.fillText(vit, node.x, node.y);
   }
 
   draw(highlightIds = [], forceActiveConnections = false) {
@@ -664,23 +651,14 @@ export class SupplementTree extends BaseTree {
     const highlightOrgs = selectedNodeForBody ? (selectedNodeForBody.organs || []) : [];
     const isNegativeImpact = !!(selectedNodeForBody && (selectedNodeForBody.impact === 'negative' || selectedNodeForBody._isNegative));
 
-    // Issue #2 PNG body (preferred). Vector version kept only for comparison.
-    if (SupplementTree.USE_PNG_BODY && this._bodyPngReady) {
+    // PNG body is the only version.
+    if (this._bodyPngReady) {
       this._drawCentralBodyPng(ctx, 0, 0, 3.15, highlightOrgs, isNegativeImpact);
     } else {
-      this._drawCentralBodyVector(ctx, 0, 0, 3.15, highlightOrgs, isNegativeImpact);
+      console.warn('[AETHERIS] Body PNGs not ready');
     }
 
-    // Dev helper: window.AETHERIS.togglePngBody() to flip and redraw instantly
-    if (!window.AETHERIS || !window.AETHERIS._pngToggleInstalled) {
-      const api = window.AETHERIS = window.AETHERIS || {};
-      api.togglePngBody = () => {
-        SupplementTree.USE_PNG_BODY = !SupplementTree.USE_PNG_BODY;
-        console.log('[AETHERIS] PNG body =', SupplementTree.USE_PNG_BODY);
-        if (api.tree && typeof api.tree.draw === 'function') api.tree.draw();
-      };
-      api._pngToggleInstalled = true;
-    }
+    // PNG body is the only version. No toggle.
 
     // Culling + simplified rendering during panning for smooth 60fps+ on mobile
     const margin = 60;
@@ -775,7 +753,7 @@ export class SupplementTree extends BaseTree {
       ctx.arc(node.x, node.y, r - 5.2, 0, Math.PI * 2);
       ctx.stroke();
 
-      this._drawNodeScoreTriangle(ctx, node, r, { isDimmed, isSelected, isHighValue });
+      this._drawNodeScore(ctx, node, r, { isDimmed, isSelected, isHighValue });
 
       const labelSize = Math.round(Math.max(8, Math.min(11, r * 0.38)));
       ctx.fillStyle = isDimmed ? "#6b7280" : (isSelected ? "#f4e9c8" : "#e5e7eb");
@@ -866,520 +844,7 @@ export class SupplementTree extends BaseTree {
   }
 
   /**
-   * Original vector body (preserved as fallback).
-   * See GitHub issue #2 for the PNG layered replacement.
-   * To force vector mode at runtime: SupplementTree.USE_PNG_BODY = false; then tree.draw();
-   */
-  _drawCentralBodyVector(ctx, cx, cy, s, highlightOrgs = [], isNegative = false) {
-    // Use a Set for O(1) lookups instead of calling .includes() repeatedly on an array
-    const active = new Set(highlightOrgs);
-    
-    const hx = (x) => cx + (x - 85) * s;
-    const hy = (y) => cy + (y - 100) * s;
-    const organCol = (key) => this.organColors[key] || '#d4af37';
-    // For negative impact (bad foods etc), use red for damaged organs instead of their normal color
-    const getHighlightColor = (key) => (isNegative && active.has(key)) ? '#ef4444' : organCol(key);
-
-    const traceOuterSilhouette = () => {
-      ctx.beginPath();
-      ctx.moveTo(hx(85), hy(18));
-      ctx.quadraticCurveTo(hx(68), hy(50), hx(74), hy(98));
-      ctx.quadraticCurveTo(hx(77), hy(138), hx(70), hy(176));
-      ctx.quadraticCurveTo(hx(85), hy(192), hx(100), hy(176));
-      ctx.quadraticCurveTo(hx(92), hy(138), hx(97), hy(98));
-      ctx.quadraticCurveTo(hx(103), hy(50), hx(85), hy(18));
-      ctx.closePath();
-    };
-
-    const traceInnerTorso = () => {
-      ctx.beginPath();
-      ctx.moveTo(hx(85), hy(22));
-      ctx.quadraticCurveTo(hx(72), hy(48), hx(76), hy(92));
-      ctx.quadraticCurveTo(hx(79), hy(130), hx(72), hy(170));
-      ctx.quadraticCurveTo(hx(85), hy(184), hx(98), hy(170));
-      ctx.quadraticCurveTo(hx(90), hy(130), hx(95), hy(92));
-      ctx.quadraticCurveTo(hx(100), hy(48), hx(85), hy(22));
-      ctx.closePath();
-    };
-
-    ctx.save();
-
-    // Ambient halo behind the figure
-    const coreX = hx(85);
-    const coreY = hy(95);
-    const amb = ctx.createRadialGradient(coreX, coreY, 8 * s, coreX, coreY, 130 * s);
-    amb.addColorStop(0, active.has('skin') ? 'rgba(251, 191, 36, 0.14)' : 'rgba(103, 232, 249, 0.07)');
-    amb.addColorStop(0.45, 'rgba(167, 139, 250, 0.05)');
-    amb.addColorStop(1, 'transparent');
-    ctx.fillStyle = amb;
-    ctx.beginPath();
-    ctx.arc(coreX, coreY, 130 * s, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Skin aura (outer rim)
-    traceOuterSilhouette();
-    ctx.strokeStyle = active.has('skin') ? organCol('skin') : '#1e293b';
-    ctx.lineWidth = (active.has('skin') ? 14 : 7) * s;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.globalAlpha = active.has('skin') ? 0.35 : 0.14;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    // Body fill — soft vertical depth
-    traceInnerTorso(); // Trace ONCE, apply multiple fills/strokes
-    const bodyFill = ctx.createLinearGradient(coreX, hy(20), coreX, hy(180));
-    bodyFill.addColorStop(0, 'rgba(30, 41, 59, 0.55)');
-    bodyFill.addColorStop(0.35, 'rgba(15, 23, 42, 0.72)');
-    bodyFill.addColorStop(0.7, 'rgba(12, 18, 32, 0.82)');
-    bodyFill.addColorStop(1, 'rgba(8, 12, 22, 0.9)');
-    ctx.fillStyle = bodyFill;
-    ctx.fill();
-
-    // Rim highlight + outline (Reusing the active Torso path)
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 1.2 * s;
-    ctx.globalAlpha = 0.5;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    const rimGrad = ctx.createLinearGradient(hx(70), hy(50), hx(100), hy(50));
-    rimGrad.addColorStop(0, '#334155');
-    rimGrad.addColorStop(0.5, '#64748b');
-    rimGrad.addColorStop(1, '#334155');
-    ctx.strokeStyle = rimGrad;
-    ctx.lineWidth = 2.2 * s;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
-    // Torso cavity outline
-    ctx.strokeStyle = '#3d4a5c';
-    ctx.lineWidth = 1.4 * s;
-    ctx.globalAlpha = 0.55;
-    ctx.beginPath();
-    ctx.moveTo(hx(74), hy(46));
-    ctx.quadraticCurveTo(hx(66), hy(78), hx(70), hy(115));
-    ctx.quadraticCurveTo(hx(85), hy(125), hx(100), hy(115));
-    ctx.quadraticCurveTo(hx(104), hy(78), hx(96), hy(46));
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    // Spine
-    const spineActive = active.has('bones') || active.has('joints');
-    ctx.strokeStyle = spineActive ? '#e2e8f0' : '#475569';
-    ctx.lineWidth = (spineActive ? 2.2 : 1.4) * s;
-    ctx.globalAlpha = spineActive ? 0.75 : 0.35;
-    ctx.beginPath();
-    ctx.moveTo(hx(85), hy(40));
-    ctx.lineTo(hx(85), hy(120));
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    // Neck
-    ctx.strokeStyle = '#3d4a5c';
-    ctx.lineWidth = 4.5 * s;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(hx(82), hy(38));
-    ctx.quadraticCurveTo(hx(85), hy(42), hx(88), hy(38));
-    ctx.stroke();
-
-    // Head shell with gradient
-    const headX = hx(85);
-    const headY = hy(26);
-    const headR = 13 * s;
-    const headGrad = ctx.createRadialGradient(headX - 4 * s, headY - 5 * s, headR * 0.2, headX, headY, headR);
-    headGrad.addColorStop(0, 'rgba(71, 85, 105, 0.5)');
-    headGrad.addColorStop(0.6, 'rgba(30, 41, 59, 0.65)');
-    headGrad.addColorStop(1, 'rgba(15, 23, 42, 0.85)');
-    ctx.fillStyle = headGrad;
-    ctx.beginPath();
-    ctx.arc(headX, headY, headR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 2 * s;
-    ctx.stroke();
-
-    // Eyes (small and simple - keep as circles for clarity)
-    const eyeCol = organCol('eyes');
-    const hasEyes = active.has('eyes');
-    [[79, 25], [91, 25]].forEach(([ex, ey]) => {
-      const x = hx(ex);
-      const y = hy(ey);
-      if (hasEyes) this._drawOrganGlow(ctx, x, y, 4 * s, eyeCol, true);
-      
-      ctx.fillStyle = hasEyes ? eyeCol : '#4b5563';
-      ctx.beginPath();
-      ctx.arc(x, y, 2.2 * s, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.fillStyle = hasEyes ? '#e0f2fe' : '#1e293b';
-      ctx.beginPath();
-      ctx.arc(x - 0.4 * s, y - 0.3 * s, 0.9 * s, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Thyroid (butterfly shape - two lobes)
-    const hasThyroid = active.has('thyroid');
-    const thyroidCol = getHighlightColor('thyroid');
-    const tcx = hx(85);
-    const tcy = hy(40);
-    if (hasThyroid) this._drawOrganGlow(ctx, tcx, tcy, 6 * s, thyroidCol, true);
-    ctx.fillStyle = hasThyroid ? thyroidCol : '#3d4a5c';
-    ctx.globalAlpha = hasThyroid ? 0.85 : 0.28;
-    // Left lobe
-    ctx.beginPath();
-    ctx.ellipse(hx(80), tcy, 3.2 * s, 2.8 * s, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    // Right lobe
-    ctx.beginPath();
-    ctx.ellipse(hx(90), tcy, 3.2 * s, 2.8 * s, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = hasThyroid ? thyroidCol : '#4b5568';
-    ctx.lineWidth = (hasThyroid ? 1.2 : 0.7) * s;
-    ctx.beginPath();
-    ctx.ellipse(hx(80), tcy, 3.2 * s, 2.8 * s, -0.3, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(hx(90), tcy, 3.2 * s, 2.8 * s, 0.3, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Brain - more realistic convoluted shape (wavy outline for cerebral cortex)
-    const hasBrain = active.has('brain');
-    const brainCol = getHighlightColor('brain');
-    const bcx = hx(85);
-    const bcy = hy(26);
-    if (hasBrain) this._drawOrganGlow(ctx, bcx, bcy, 10 * s, brainCol, true);
-    ctx.fillStyle = hasBrain ? brainCol : '#3d4a5c';
-    ctx.globalAlpha = hasBrain ? 0.8 : 0.3;
-    ctx.beginPath();
-    // Wavy, lobed brain outline (approximates actual cerebral hemispheres)
-    ctx.moveTo(hx(77), hy(21));
-    ctx.quadraticCurveTo(hx(74), hy(18), hx(78), hy(15)); // left top indent
-    ctx.quadraticCurveTo(hx(82), hy(17), hx(85), hy(14)); // top center cleft
-    ctx.quadraticCurveTo(hx(89), hy(16), hx(93), hy(15));
-    ctx.quadraticCurveTo(hx(96), hy(19), hx(93), hy(22)); // right upper
-    ctx.quadraticCurveTo(hx(95), hy(27), hx(92), hy(32)); // right side
-    ctx.quadraticCurveTo(hx(88), hy(35), hx(82), hy(34)); // bottom right
-    ctx.quadraticCurveTo(hx(78), hy(33), hx(75), hy(30)); // bottom left
-    ctx.quadraticCurveTo(hx(73), hy(25), hx(77), hy(21)); // left side back
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = hasBrain ? brainCol : '#4b5568';
-    ctx.lineWidth = (hasBrain ? 1.4 : 0.8) * s;
-    ctx.stroke();
-    // Add a few fold lines (sulci) for "actual" texture when highlighted
-    if (hasBrain) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-      ctx.lineWidth = 0.7 * s;
-      ctx.beginPath();
-      ctx.moveTo(hx(80), hy(20));
-      ctx.quadraticCurveTo(hx(83), hy(24), hx(80), hy(28));
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(hx(90), hy(20));
-      ctx.quadraticCurveTo(hx(87), hy(25), hx(89), hy(30));
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(hx(82), hy(17));
-      ctx.quadraticCurveTo(hx(85), hy(22), hx(88), hy(18));
-      ctx.stroke();
-    }
-
-    // Nerves (subtle arcs from brain) - single path + stroke
-    if (active.has('nerves')) {
-      ctx.strokeStyle = organCol('nerves');
-      ctx.lineWidth = 1.2 * s;
-      ctx.globalAlpha = 0.65;
-      ctx.beginPath();
-      ctx.moveTo(hx(85), hy(32));
-      ctx.quadraticCurveTo(hx(72), hy(55), hx(68), hy(58));
-      ctx.moveTo(hx(85), hy(32)); // Continuous path, single stroke call
-      ctx.quadraticCurveTo(hx(98), hy(55), hx(102), hy(58));
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-
-    // Lungs - actual-ish lobed shapes (not plain ellipses)
-    const hasLungs = active.has('lungs');
-    const lungCol = getHighlightColor('lungs');
-    const drawLung = (baseX, baseY, isRightLung /* anatomical */) => {
-      const lx = hx(baseX);
-      const ly = hy(baseY);
-      if (hasLungs) this._drawOrganGlow(ctx, lx, ly, 11 * s, lungCol, true);
-      ctx.fillStyle = hasLungs ? lungCol : '#3d4a5c';
-      ctx.globalAlpha = hasLungs ? 0.7 : 0.22;
-      ctx.beginPath();
-      if (isRightLung) {
-        // Anatomical right lung (screen left) - 3 lobes, larger
-        ctx.moveTo(hx(baseX), hy(baseY - 13)); // apex
-        ctx.quadraticCurveTo(hx(baseX - 9), hy(baseY - 8), hx(baseX - 10), hy(baseY + 2)); // upper lobe left
-        ctx.quadraticCurveTo(hx(baseX - 12), hy(baseY + 5), hx(baseX - 7), hy(baseY + 6)); // horizontal fissure
-        ctx.quadraticCurveTo(hx(baseX - 13), hy(baseY + 12), hx(baseX - 8), hy(baseY + 16)); // lower lobe
-        ctx.quadraticCurveTo(hx(baseX + 1), hy(baseY + 17), hx(baseX + 6), hy(baseY + 12)); // base
-        ctx.quadraticCurveTo(hx(baseX + 7), hy(baseY + 4), hx(baseX + 4), hy(baseY - 2)); // right edge + cardiac space
-        ctx.quadraticCurveTo(hx(baseX + 2), hy(baseY - 9), hx(baseX), hy(baseY - 13)); // back to apex
-      } else {
-        // Anatomical left lung (screen right) - 2 lobes, notched for heart
-        ctx.moveTo(hx(baseX), hy(baseY - 12));
-        ctx.quadraticCurveTo(hx(baseX + 8), hy(baseY - 7), hx(baseX + 7), hy(baseY + 1));
-        ctx.quadraticCurveTo(hx(baseX + 9), hy(baseY + 4), hx(baseX + 4), hy(baseY + 5)); // notch
-        ctx.quadraticCurveTo(hx(baseX + 10), hy(baseY + 10), hx(baseX + 3), hy(baseY + 15));
-        ctx.quadraticCurveTo(hx(baseX - 2), hy(baseY + 14), hx(baseX - 5), hy(baseY + 8));
-        ctx.quadraticCurveTo(hx(baseX - 4), hy(baseY - 2), hx(baseX), hy(baseY - 12));
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = hasLungs ? lungCol : '#4b5568';
-      ctx.lineWidth = (hasLungs ? 1.3 : 0.6) * s;
-      ctx.stroke();
-      // subtle internal fissure lines
-      if (hasLungs) {
-        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-        ctx.lineWidth = 0.6 * s;
-        if (isRightLung) {
-          ctx.beginPath();
-          ctx.moveTo(hx(baseX - 5), hy(baseY + 2));
-          ctx.lineTo(hx(baseX - 8), hy(baseY + 12));
-          ctx.stroke();
-        } else {
-          ctx.beginPath();
-          ctx.moveTo(hx(baseX + 3), hy(baseY + 3));
-          ctx.lineTo(hx(baseX + 1), hy(baseY + 10));
-          ctx.stroke();
-        }
-      }
-    };
-    // Anatomical Right Lung (Screen Left position): larger 3-lobed
-    drawLung(71, 68, true);
-    // Anatomical Left Lung (Screen Right position): smaller notched
-    drawLung(99, 68, false);
-
-    // Heart (more realistic anatomical shape - tilted, with ventricles/atria suggestion)
-    const heartCol = getHighlightColor('heart');
-    const hasHeart = active.has('heart');
-    const hcx = hx(92);
-    const hcy = hy(78);
-    
-    this._drawOrganGlow(ctx, hcx, hcy, 14 * s, heartCol, hasHeart);
-    const heartGrad = ctx.createRadialGradient(hcx - 2 * s, hcy - 2 * s, 0, hcx, hcy, 12 * s);
-    if (hasHeart) {
-      heartGrad.addColorStop(0, '#fecaca');
-      heartGrad.addColorStop(0.4, heartCol);
-      heartGrad.addColorStop(1, heartCol + '44');
-    } else {
-      heartGrad.addColorStop(0, '#4a5568');
-      heartGrad.addColorStop(1, '#1e293b');
-    }
-    
-    // Trace Heart ONCE - improved anatomical shape (right side of screen = patient's left)
-    ctx.beginPath();
-    ctx.moveTo(hx(88), hy(68)); // base (atria)
-    ctx.quadraticCurveTo(hx(96), hy(72), hx(98), hy(80)); // right upper ventricle curve
-    ctx.quadraticCurveTo(hx(95), hy(88), hx(88), hy(90)); // apex (points down-leftish)
-    ctx.quadraticCurveTo(hx(82), hy(85), hx(80), hy(76)); // left lower
-    ctx.quadraticCurveTo(hx(84), hy(70), hx(88), hy(68)); // back, slight cleft
-    ctx.closePath();
-    
-    ctx.fillStyle = heartGrad;
-    ctx.globalAlpha = hasHeart ? 0.9 : 0.4;
-    ctx.fill();
-    
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = hasHeart ? heartCol : '#4b5568';
-    ctx.lineWidth = (hasHeart ? 2 : 1) * s;
-    ctx.shadowBlur = hasHeart ? 10 * s : 0;
-    ctx.shadowColor = heartCol;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    // small highlight on active for "actual" depth
-    if (hasHeart) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-      ctx.lineWidth = 0.8 * s;
-      ctx.beginPath();
-      ctx.moveTo(hx(90), hy(71));
-      ctx.quadraticCurveTo(hx(93), hy(78), hx(90), hy(83));
-      ctx.stroke();
-    }
-
-    // Immune (thymus / upper chest) - keep ellipse but slightly shaped
-    this._drawOrganEllipse(ctx, hx, hy, 85, 58, 5, 4, s, getHighlightColor('immune'), active.has('immune'), 0.25);
-
-    // Liver - actual lobed shape (anatomical right = screen left, large right lobe)
-    const hasLiver = active.has('liver');
-    const liverCol = getHighlightColor('liver');
-    const lvx = hx(72);
-    const lvy = hy(92);
-    if (hasLiver) this._drawOrganGlow(ctx, lvx, lvy, 12 * s, liverCol, true);
-    ctx.fillStyle = hasLiver ? liverCol : '#3d4a5c';
-    ctx.globalAlpha = hasLiver ? 0.72 : 0.28;
-    ctx.beginPath();
-    // Liver: wide left (screen), tapers right, inferior border curved, superior flatish
-    ctx.moveTo(hx(60), hy(86)); // superior left
-    ctx.quadraticCurveTo(hx(55), hy(88), hx(56), hy(96)); // left inferior (big lobe)
-    ctx.quadraticCurveTo(hx(62), hy(100), hx(78), hy(99)); // inferior border
-    ctx.quadraticCurveTo(hx(82), hy(95), hx(80), hy(88)); // right (smaller lobe + falciform)
-    ctx.quadraticCurveTo(hx(72), hy(85), hx(60), hy(86)); // superior
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = hasLiver ? liverCol : '#4b5568';
-    ctx.lineWidth = (hasLiver ? 1.4 : 0.7) * s;
-    ctx.stroke();
-    // hint of falciform ligament / division
-    if (hasLiver) {
-      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-      ctx.lineWidth = 0.5 * s;
-      ctx.beginPath();
-      ctx.moveTo(hx(72), hy(87));
-      ctx.lineTo(hx(73), hy(97));
-      ctx.stroke();
-    }
-
-    // Gut + Stomach (actual shapes: stomach is a curved sac, intestines coiled)
-    const hasGut = active.has('gut');
-    const gutCol = getHighlightColor('gut');
-    if (hasGut) this._drawOrganGlow(ctx, hx(90), hy(96), 8 * s, gutCol, true);
-    ctx.fillStyle = hasGut ? gutCol : '#3d4a5c';
-    ctx.globalAlpha = hasGut ? 0.7 : 0.25;
-    
-    // Stomach (J-shaped sac on screen-right under heart/left lung)
-    ctx.beginPath();
-    ctx.moveTo(hx(88), hy(88)); // cardia (top)
-    ctx.quadraticCurveTo(hx(95), hy(86), hx(101), hy(90)); // greater curve out
-    ctx.quadraticCurveTo(hx(100), hy(97), hx(94), hy(100)); // antrum/pylorus
-    ctx.quadraticCurveTo(hx(89), hy(98), hx(88), hy(92)); // lesser curve back
-    ctx.closePath();
-    ctx.fill();
-    
-    // Small intestine coils (multiple overlapping loops for "actual" look)
-    const coil = (ox, oy, rw, rh) => {
-      ctx.beginPath();
-      ctx.ellipse(hx(ox), hy(oy), rw * s, rh * s, 0, 0, Math.PI * 2);
-      ctx.fill();
-    };
-    coil(83, 108, 4, 3.5);
-    coil(88, 112, 4.5, 3);
-    coil(82, 116, 5, 3.2);
-    coil(90, 118, 3.5, 2.8);
-    coil(85, 113, 3, 2.5); // center overlap
-    
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = hasGut ? gutCol : '#4b5568';
-    ctx.lineWidth = (hasGut ? 1.1 : 0.6) * s;
-    // re-stroke stomach + coils (simple, for speed just re-do a couple)
-    ctx.beginPath();
-    ctx.moveTo(hx(88), hy(88));
-    ctx.quadraticCurveTo(hx(95), hy(86), hx(101), hy(90));
-    ctx.quadraticCurveTo(hx(100), hy(97), hx(94), hy(100));
-    ctx.quadraticCurveTo(hx(89), hy(98), hx(88), hy(92));
-    ctx.closePath();
-    ctx.stroke();
-    // coil strokes (simplified)
-    ctx.beginPath(); ctx.ellipse(hx(83), hy(108), 4*s, 3.5*s, 0,0,Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(hx(88), hy(112), 4.5*s, 3*s, 0,0,Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(hx(82), hy(116), 5*s, 3.2*s, 0,0,Math.PI*2); ctx.stroke();
-
-    // Mito — layered energy glow
-    const mitoCol = getHighlightColor('mito');
-    const mx = hx(88);
-    const my = hy(78);
-    const hasMito = active.has('mito');
-    
-    if (hasMito) {
-      for (const [r, a] of [[9, 0.12], [6.5, 0.22], [4.2, 0.45]]) {
-        const mg = ctx.createRadialGradient(mx, my, 0, mx, my, r * s);
-        mg.addColorStop(0, mitoCol + 'aa');
-        mg.addColorStop(1, 'transparent');
-        ctx.fillStyle = mg;
-        ctx.globalAlpha = a;
-        ctx.beginPath();
-        ctx.arc(mx, my, r * s, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
-    ctx.fillStyle = hasMito ? mitoCol : '#3d4a5c';
-    ctx.globalAlpha = hasMito ? 0.75 : 0.25;
-    ctx.beginPath();
-    ctx.arc(mx, my, (hasMito ? 4.5 : 3.2) * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // Arms
-    const muscleCol = getHighlightColor('muscle');
-    const hasMuscle = active.has('muscle');
-    const drawArm = (x1, y1, cx1, cy1, x2, y2) => {
-      ctx.strokeStyle = hasMuscle ? muscleCol : '#3d4a5c';
-      ctx.lineWidth = (hasMuscle ? 5.5 : 4) * s;
-      ctx.lineCap = 'round';
-      ctx.globalAlpha = hasMuscle ? 0.9 : 0.5;
-      if (hasMuscle) {
-        ctx.shadowBlur = 8 * s;
-        ctx.shadowColor = muscleCol;
-      }
-      ctx.beginPath();
-      ctx.moveTo(hx(x1), hy(y1));
-      ctx.quadraticCurveTo(hx(cx1), hy(cy1), hx(x2), hy(y2));
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-    };
-    drawArm(68, 58, 52, 78, 55, 115);
-    drawArm(102, 58, 118, 78, 115, 115);
-
-    // Legs (single path + stroke for both)
-    const hasBones = active.has('bones');
-    const bonesActiveColor = (isNegative && hasBones) ? '#ef4444' : '#e2e8f0';
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = hasBones ? bonesActiveColor : '#3d4a5c';
-    ctx.lineWidth = (hasBones ? 5 : 4.2) * s;
-    ctx.globalAlpha = hasBones ? 0.65 : 0.42;
-    ctx.beginPath();
-    ctx.moveTo(hx(77), hy(123));
-    ctx.quadraticCurveTo(hx(71), hy(155), hx(74), hy(177));
-    ctx.moveTo(hx(93), hy(123)); // Continuous path, single stroke call
-    ctx.quadraticCurveTo(hx(99), hy(155), hx(96), hy(177));
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    // Joints (shoulders + knees)
-    const jointCol = getHighlightColor('joints');
-    const boneCol = getHighlightColor('bones');
-    const hasJoints = active.has('joints');
-    
-    [[68, 55, jointCol, hasJoints], 
-     [102, 55, jointCol, hasJoints],
-     [74, 153, boneCol, hasBones || hasJoints], 
-     [96, 153, boneCol, hasBones || hasJoints]]
-      .forEach(([sx, sy, color, isActive]) => {
-        const x = hx(sx);
-        const y = hy(sy);
-        if (isActive) this._drawOrganGlow(ctx, x, y, 5 * s, color, true);
-        ctx.fillStyle = isActive ? color : '#3d4a5c';
-        ctx.globalAlpha = isActive ? 0.9 : 0.4;
-        ctx.beginPath();
-        ctx.arc(x, y, (isActive ? 3.2 : 2.6) * s, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      });
-
-    ctx.restore();
-  }
-
-  /**
-   * PNG-based layered body + organs (GitHub issue #2).
-   * - Gender-aware base from Personal Corner (male/female).
-   * - Individual organ PNGs with transparent bg, drawn in z-order.
-   * - Reuses the existing _drawOrganGlow + highlightOrgs + isNegative logic.
-   * - Keeps cheap vector accents (ambient halo, spine, arms/legs strokes, joints) on top for polish.
-   * - The old full vector implementation lives untouched as _drawCentralBodyVector.
-   *
-   * All tuning lives in PNG_BODY_CONFIG + PNG_ORGAN_CONFIG at the top of the class.
-   * Set USE_PNG_BODY=false then call tree.draw() (or use window.AETHERIS.togglePngBody()) to compare.
+   * PNG-based layered body + organs.
    */
   _drawCentralBodyPng(ctx, cx, cy, s, highlightOrgs = [], isNegative = false) {
     const active = new Set(highlightOrgs);
@@ -1500,7 +965,7 @@ export class SupplementTree extends BaseTree {
 
       // The actual organ PNG.
       // When something is selected, non-active organs become quite transparent so the highlighted
-      // ones (and their shaped glow) really stand out — similar to how the old vector organs behaved.
+      // ones (and their shaped glow) really stand out.
       const idleAlpha = hasSelection
         ? (SupplementTree.PNG_IDLE_ALPHA_WITH_SELECTION ?? 0.22)
         : (SupplementTree.PNG_IDLE_ALPHA_NO_SELECTION ?? 0.78);
@@ -1535,7 +1000,7 @@ export class SupplementTree extends BaseTree {
       this._drawOrganEllipse(ctx, hx, hy, 85, 58, 5, 4, s, getHighlightColor('immune'), active.has('immune'), 0.28);
     }
 
-    // Keep a few cheap vector structural accents on top of the PNG body.
+    // Keep a few cheap structural accents on top of the PNG body.
     // These give nice "active" feedback on limbs/spine without requiring extra PNGs.
     // (The body bases already provide the main silhouette + limbs.)
 
