@@ -274,7 +274,7 @@ export const dataMeta = {
 ## 12. Other Quick Wins
 
 - **Keyboard `f` behavior:** currently forces `enableAllGroups`; make it toggle on/off. ✅ (uses toggleAllGroups)
-- **Touch/mobile:** add touch-drag pan and pinch-zoom for mobile devices. ✅ (unified pointer events + inertia)
+- **Touch/mobile:** add touch-drag pan and pinch-zoom for mobile devices. ✅ (unified pointer events + inertia + full multi-pointer pinch zoom with focal point)
 - **Canvas panning perf (GitHub #12):** RAF batching, pointer events unification, inertia/momentum. ✅ Implemented 2026-06.
 - **Node collision density:** with 100+ food nodes, the `_settleNodePositions` iterations may need dynamic scaling to prevent slow frames.
 - **Social meta tags:** add Open Graph / Twitter Card meta tags in `index.html` so shared links render rich cards.

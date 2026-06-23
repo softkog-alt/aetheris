@@ -35,8 +35,8 @@ Generated 2026-06-23 from live repo issues on softkog-alt/aetheris.
 - Many data fields recommended for future personalization.
 
 ## Next Actions Recommended
-1. Verify panning smoothness on real mobile + desktop (dev or preview).
-2. Close #4, #12 after user testing.
+1. Pinch-to-zoom now implemented on mobile (pointer multi-touch + focal). Panning confirmed smooth by user.
+2. Close #4, #12 after final user testing.
 3. For #8: extend data with numeric dosage min/opt fields + make bar draggable + live personal marker.
 4. Tackle Environment (#13) or Blood (#3) for next major feature.
 5. Consider closing low-activity open issues that are de-facto done (#5,7,9,10,11).

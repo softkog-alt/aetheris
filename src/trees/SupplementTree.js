@@ -1071,9 +1071,35 @@ export class SupplementTree extends BaseTree {
   }
 
   zoom(delta) {
-    const v = this.view;
     const factor = delta > 0 ? 1.18 : 0.82;
-    v.scale = Math.max(0.55, Math.min(2.8, v.scale * factor));
+    this.zoomFactor(factor);
+  }
+
+  /**
+   * Zoom by direct multiplicative factor (for pinch).
+   * If focalX/focalY (canvas-local logical pixels) provided, zoom centered on that point.
+   */
+  zoomFactor(factor, focalX = null, focalY = null) {
+    const v = this.view;
+    if (!v) return;
+    const oldScale = v.scale || 1;
+    let newScale = oldScale * factor;
+    newScale = Math.max(0.55, Math.min(2.8, newScale));
+
+    if (focalX != null && focalY != null) {
+      const { width: w, height: h } = this.getLogicalSize();
+      const panX = v.panX ?? v.scrollX ?? 0;
+      const panY = v.panY ?? v.scrollY ?? 0;
+      const worldAtFocalX = panX + (focalX - w / 2) / oldScale;
+      const worldAtFocalY = panY + (focalY - h / 2) / oldScale;
+      v.scale = newScale;
+      v.panX = worldAtFocalX - (focalX - w / 2) / newScale;
+      v.panY = worldAtFocalY - (focalY - h / 2) / newScale;
+    } else {
+      v.scale = newScale;
+    }
+    delete v.scrollX;
+    delete v.scrollY;
     this._scheduleDraw();
   }
 

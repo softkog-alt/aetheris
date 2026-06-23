@@ -3,7 +3,7 @@
  * 
  * Body-centric visualization: central body model with nodes clustered around the
  * organs they influence most (higher vitality = closer + larger). Each node shows
- * Longevity (L), QoL (Q), and overall vitality. Works for both Supplements and Habits.
+ * centered vitality score + short name + warnings. Works for both Supplements and Habits.
  */
 
 import { supplements, categories, organMeta } from "./data/supplements.js";
@@ -93,6 +93,13 @@ document.addEventListener("DOMContentLoaded", () => {
     stopInertia();
     hoverPopup.hide();
     if (window.AETHERIS?.bottomSheet) window.AETHERIS.bottomSheet.close(true);
+    // Reset multi-touch/pinch state on tree switch
+    activePointers.clear();
+    prevPinchDist = 0;
+    isPinching = false;
+    pointerDown = false;
+    isPanning = false;
+    activePointerId = null;
 
     if (treeInstance) {
       treeInstance._isPanning = false;
@@ -357,6 +364,11 @@ document.addEventListener("DOMContentLoaded", () => {
   let lastX = 0, lastY = 0;
   let activePointerId = null;
 
+  // Multi-touch state for pinch-to-zoom on phones/tablets
+  let activePointers = new Map(); // pointerId -> {x, y}
+  let prevPinchDist = 0;
+  let isPinching = false;
+
   // Inertia state (issue #12)
   let lastPanDx = 0;
   let lastPanDy = 0;
@@ -370,6 +382,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (treeInstance) treeInstance._isPanning = false;
     lastPanDx = 0;
     lastPanDy = 0;
+    // End any active pinch when stopping gestures
+    if (isPinching) {
+      isPinching = false;
+      prevPinchDist = 0;
+    }
   }
 
   function startInertia(vx, vy) {
@@ -401,9 +418,24 @@ document.addEventListener("DOMContentLoaded", () => {
   canvas.addEventListener('pointerdown', (e) => {
     if (!treeInstance) return;
     if (e.button !== 0 && e.pointerType === 'mouse') return;
-    activePointerId = e.pointerId;
+    activePointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
     stopInertia();
+    if (activePointers.size >= 2) {
+      // Pinch gesture started
+      isPinching = true;
+      if (treeInstance) treeInstance._isPanning = true;
+      const pts = Array.from(activePointers.values());
+      prevPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      // Do not treat as single-finger pan
+      pointerDown = false;
+      isPanning = false;
+      activePointerId = null;
+      hoverPopup.hide();
+      return;
+    }
+    // Single pointer: start potential pan (mouse or touch)
+    activePointerId = e.pointerId;
     pointerDown = true;
     isPanning = false;
     if (treeInstance) treeInstance._isPanning = false;
@@ -418,7 +450,30 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   window.addEventListener('pointermove', (e) => {
-    if (!treeInstance || !pointerDown || (activePointerId !== null && e.pointerId !== activePointerId)) return;
+    if (!treeInstance) return;
+    // Track pointer position if active
+    if (activePointers.has(e.pointerId)) {
+      activePointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    }
+
+    if (activePointers.size >= 2) {
+      // Pinch-to-zoom (two fingers)
+      const pts = Array.from(activePointers.values());
+      const currDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      if (prevPinchDist > 5 && currDist > 5) {
+        const scaleFactor = currDist / prevPinchDist;
+        const midClientX = (pts[0].x + pts[1].x) / 2;
+        const midClientY = (pts[0].y + pts[1].y) / 2;
+        const rect = canvas.getBoundingClientRect();
+        const localX = midClientX - rect.left;
+        const localY = midClientY - rect.top;
+        treeInstance.zoomFactor(scaleFactor, localX, localY);
+        prevPinchDist = currDist;
+      }
+      return;
+    }
+
+    if (!pointerDown || (activePointerId !== null && e.pointerId !== activePointerId)) return;
     const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
     if (!isPanning && moved > DRAG_THRESHOLD) {
       isPanning = true;
@@ -451,31 +506,44 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   function endPointer(e) {
-    if (activePointerId !== null && e && e.pointerId !== activePointerId) return;
+    if (e && e.pointerId != null) {
+      activePointers.delete(e.pointerId);
+    }
+    const wasPinching = isPinching;
     const wasPanning = isPanning;
-    if (wasPanning) suppressNextClick = true;
-    if (wasPanning && (Math.abs(lastPanDx) > 1 || Math.abs(lastPanDy) > 1)) {
-      startInertia(lastPanDx, lastPanDy);
+    if (wasPinching || wasPanning) suppressNextClick = true;
+
+    // If fingers lifted, end pinch
+    if (activePointers.size < 2) {
+      isPinching = false;
+      prevPinchDist = 0;
     }
-    pointerDown = false;
-    isPanning = false;
-    if (treeInstance) {
-      treeInstance._isPanning = false;
-      // Force a draw after pan ends (nodes now use same simplified rendering for scroll/static)
-      if (typeof treeInstance.draw === 'function') treeInstance.draw();
+
+    if (wasPinching || wasPanning) {
+      if (treeInstance) {
+        treeInstance._isPanning = false;
+        // Force a draw after gesture ends (nodes use same simplified rendering)
+        if (typeof treeInstance.draw === 'function') treeInstance.draw();
+      }
     }
-    activePointerId = null;
-    try { if (e && e.pointerId) canvas.releasePointerCapture(e.pointerId); } catch (_) {}
-    canvas.style.cursor = 'grab';
-    lastPanDx = 0;
-    lastPanDy = 0;
-    // Tap-to-select for touch/pen when not panned
-    if (!wasPanning && e && (e.pointerType === 'touch' || e.pointerType === 'pen') && e.clientX != null) {
-      const fake = { clientX: e.clientX, clientY: e.clientY };
-      const { x: mx, y: my } = canvasPointer(fake);
-      const hit = treeInstance.getNodeAt(mx, my);
-      handleNodeSelection(hit || null);
-      if (!hit) hoverPopup.hide();
+
+    if (activePointers.size === 0) {
+      pointerDown = false;
+      isPanning = false;
+      activePointerId = null;
+      lastPanDx = 0;
+      lastPanDy = 0;
+      try { if (e && e.pointerId) canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+      canvas.style.cursor = 'grab';
+
+      // Tap-to-select for touch/pen when not panned or pinched
+      if (!wasPanning && !wasPinching && e && (e.pointerType === 'touch' || e.pointerType === 'pen') && e.clientX != null) {
+        const fake = { clientX: e.clientX, clientY: e.clientY };
+        const { x: mx, y: my } = canvasPointer(fake);
+        const hit = treeInstance.getNodeAt(mx, my);
+        handleNodeSelection(hit || null);
+        if (!hit) hoverPopup.hide();
+      }
     }
   }
 
@@ -490,12 +558,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Legacy mouseup for safety (some edge cases)
   window.addEventListener('mouseup', () => {
-    if (!pointerDown) return;
+    if (!pointerDown && activePointers.size === 0) return;
     // covered by pointerup, but ensure
     if (isPanning) suppressNextClick = true;
     pointerDown = false;
     isPanning = false;
     if (treeInstance) treeInstance._isPanning = false;
+    // Clean any stray pointer state
+    activePointers.clear();
+    prevPinchDist = 0;
+    isPinching = false;
     canvas.style.cursor = 'grab';
   });
 
