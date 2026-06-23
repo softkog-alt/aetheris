@@ -11,11 +11,13 @@ import { habits, habitCategories } from "./data/habits.js";
 import { exercises, exerciseCategories } from "./data/exercises.js";
 import { foods, foodCategories } from "./data/foods.js";
 import { environment, environmentCategories } from "./data/environment.js";
+import { blood, bloodCategories } from "./data/blood.js";
 import { SupplementTree } from "./trees/SupplementTree.js";
 import { HabitsTree } from "./trees/HabitsTree.js";
 import { ExerciseTree } from "./trees/ExerciseTree.js";
 import { FoodsTree } from "./trees/FoodsTree.js";
 import { EnvironmentTree } from "./trees/EnvironmentTree.js";
+import { BloodTree } from "./trees/BloodTree.js";
 import { HoverPopup } from "./components/HoverPopup.js";
 import { ExplorerModal } from "./components/ExplorerModal.js";
 import { BottomSheet } from "./components/BottomSheet.js";
@@ -112,6 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const isExercises = type === 'exercises';
     const isFoods = type === 'foods';
     const isEnvironment = type === 'environment';
+    const isBlood = type === 'blood';
 
     // Create the right tree class
     if (isSupplements) {
@@ -138,6 +141,12 @@ document.addEventListener("DOMContentLoaded", () => {
       treeInstance.loadData(environment);
       validateTreeData(environment, 'environment');
       window.AETHERIS.categories = environmentCategories;
+    } else if (isBlood) {
+      treeInstance = new BloodTree(canvas);
+      bindTreeViewport(treeInstance);
+      treeInstance.loadData(blood);
+      validateTreeData(blood, 'blood');
+      window.AETHERIS.categories = bloodCategories;
     } else {
       treeInstance = new HabitsTree(canvas);
       bindTreeViewport(treeInstance);
@@ -161,7 +170,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Clear detail panel
     if (detailPanel) {
-      const label = isEnvironment ? 'environment' : (isFoods ? 'foods' : (isExercises ? 'exercises' : (isSupplements ? 'supplements' : 'habits')));
+      const label = isBlood ? 'blood' : (isEnvironment ? 'environment' : (isFoods ? 'foods' : (isExercises ? 'exercises' : (isSupplements ? 'supplements' : 'habits'))));
       detailPanel.innerHTML = `<div class="text-white/60">Select a node on the ${label} map</div>`;
     }
 
@@ -176,11 +185,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const exBtn = document.getElementById('btn-constellation-exercises');
     const foodBtn = document.getElementById('btn-constellation-foods');
     const envBtn = document.getElementById('btn-constellation-environment');
+    const bloodBtn = document.getElementById('btn-constellation-blood');
     if (supBtn) supBtn.classList.toggle('active', activeType === 'supplements');
     if (habBtn) habBtn.classList.toggle('active', activeType === 'habits');
     if (exBtn) exBtn.classList.toggle('active', activeType === 'exercises');
     if (foodBtn) foodBtn.classList.toggle('active', activeType === 'foods');
     if (envBtn) envBtn.classList.toggle('active', activeType === 'environment');
+    if (bloodBtn) bloodBtn.classList.toggle('active', activeType === 'blood');
   }
 
   function renderGroupFilters() {
@@ -594,12 +605,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const exBtn = document.getElementById('btn-constellation-exercises');
   const foodBtn = document.getElementById('btn-constellation-foods');
   const envBtn = document.getElementById('btn-constellation-environment');
+  const bloodBtn = document.getElementById('btn-constellation-blood');
 
   if (supBtn) supBtn.onclick = () => switchConstellation('supplements');
   if (habBtn) habBtn.onclick = () => switchConstellation('habits');
   if (exBtn) exBtn.onclick = () => switchConstellation('exercises');
   if (foodBtn) foodBtn.onclick = () => switchConstellation('foods');
   if (envBtn) envBtn.onclick = () => switchConstellation('environment');
+  if (bloodBtn) bloodBtn.onclick = () => switchConstellation('blood');
 
   // Mark initial active state
   updateConstellationButtons('supplements');
@@ -675,7 +688,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ${(() => {
           const p = personalData || {};
           const hasAny = Object.keys(p).some(k => p[k] !== '' && p[k] != null);
-          if (isNegative || node.impact === 'negative' || !hasAny) return '';
+          if (isNegative || node.impact === 'negative' || node._isBlood || !hasAny) return '';
           try {
             const ps = typeof personalizedScore === 'function' ? personalizedScore(node, p) : 0;
             if (ps) return `<div class="mt-1"><span class="inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/30 font-mono">${ps} <span class="font-sans text-emerald-300/70">personal match</span></span></div>`;
@@ -684,6 +697,13 @@ document.addEventListener("DOMContentLoaded", () => {
         })()}
 
         <div class="mt-3 text-xs text-white/80 leading-snug">${node.blurb}</div>
+
+        ${node._isBlood ? `
+          <div class="mt-2 grid grid-cols-2 gap-1 text-[10px]">
+            <div class="bg-[#0a0d1a] p-1 rounded">Current: <span class="font-mono text-sky-300">${node.current ?? '?'} ${node.unit || ''}</span></div>
+            <div class="bg-[#0a0d1a] p-1 rounded">Optimal: <span class="font-mono text-emerald-300">${node.optimal || node.blueprint || '—'}</span></div>
+            ${node.age_impact != null ? `<div class="bg-[#0a0d1a] p-1 rounded col-span-2">Age impact: <span class="font-mono ${node.age_impact > 0 ? 'text-red-300' : 'text-emerald-300'}">${node.age_impact > 0 ? '+' : ''}${node.age_impact} yrs</span></div>` : ''}
+          </div>` : ''}
 
         ${isNegative && (node.avoidance || node.mitigation) ? `
           <div class="mt-2">
@@ -694,7 +714,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ${(() => {
           const p = personalData || {};
           const hasAny = Object.keys(p).some(k => p[k] !== '' && p[k] != null);
-          if (isNegative || node.impact === 'negative') return '';
+          if (isNegative || node.impact === 'negative' || node._isBlood) return '';
           try {
             const ps = typeof personalizedScore === 'function' ? personalizedScore(node, p) : null;
             if (hasAny && ps) {
@@ -820,7 +840,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateDetail(node) {
     if (!detailPanel) return;
     if (!node) {
-      const label = currentTreeType === 'environment' ? 'environment' : (currentTreeType === 'habits' ? 'habits' : (currentTreeType === 'exercises' ? 'exercises' : (currentTreeType === 'foods' ? 'foods' : 'supplements')));
+      const label = currentTreeType === 'blood' ? 'blood' : (currentTreeType === 'environment' ? 'environment' : (currentTreeType === 'habits' ? 'habits' : (currentTreeType === 'exercises' ? 'exercises' : (currentTreeType === 'foods' ? 'foods' : 'supplements'))));
       detailPanel.innerHTML = `<div class="text-white/60">Select a node on the ${label} map</div>`;
       return;
     }
