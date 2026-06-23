@@ -30,8 +30,8 @@
  *   highDoseRisks: string (preferred for the orange "HIGH DOSE / CAUTION" box in inspector + SAFETY PROFILE in modal)
  *   synergies: string[] (ids of other nodes; shown in modal)
  *   gorkipedia: string (long-form HTML/text for the modal's "Gorkipedia" deep-dive tab — the richest content)
- *   url: string (e.g. "https://grokipedia.app/magnesium") — NEW: makes the External sources ↗ button open ONLY this.
- *                 If omitted, button falls back to `https://grokipedia.app/${id}`.
+ *   url: string (e.g. "https://grokipedia.com/magnesium") — NEW: makes the External sources ↗ button open ONLY this.
+ *                 If omitted, button falls back to `https://grokipedia.com/${id}`.
  *   impact: 'negative' (marks harm/damage nodes; flips colors, labels, and risk display)
  *
  * CONVENTIONS & TIPS FOR MAX COMPATIBILITY:
@@ -68,7 +68,7 @@
  *     highDoseRisks: "Supplemental elemental magnesium >350-400 mg/day often causes diarrhea...",
  *     synergies: ["vitd", "taurine", "bcomplex", "ltheanine"],
  *     gorkipedia: "Gorkipedia Entry: The forgotten mineral whose deficiency is nearly universal...",
- *     url: "https://grokipedia.app/magnesium"   // <-- makes External sources button point here only
+ *     url: "https://grokipedia.com/magnesium"   // <-- makes External sources button point here only
  *   }
  *
  * When adding new nodes, copy this shape. The inspector gracefully degrades missing optional fields,
@@ -85,7 +85,7 @@ export const supplements = [
         studies: [{year:2021, finding:"+4.7y life expectancy at high Omega-3 Index (AJCN)", source:"Meta of cohorts"}, {year:2023, finding:"Reduced all-cause & CV mortality (REDUCE-IT follow-up)", source:"RCT"}, {year:2024, finding:"Lower brain atrophy rates in older adults with higher DHA (imaging cohorts)", source:"Neurology meta"}],
         dosage: "1–2 g combined EPA+DHA daily (or Omega-3 Index target >8%)", synergies: ["vitd", "magnesium", "curcumin", "astaxanthin"], 
         gorkipedia: "Gorkipedia Entry: The most robust dietary molecule for human longevity. Multiple large cohorts show blood levels rival not smoking as a mortality predictor. Crosses the blood-brain barrier to literally rebuild the brain's architecture while simultaneously protecting the cardiovascular tree. Best obtained from cold-water fish or high-quality triglyceride-form supplements. Raises the Omega-3 Index which is now used in some clinical practices as a key risk stratifier comparable to apoB or hsCRP.",
-        url: "https://grokipedia.app/omega3",
+        url: "https://grokipedia.com/omega3",
         risks: "High doses may thin blood — consult if on anticoagulants. Choose oxidized-tested brands.",
         timing: "With a meal containing fat for absorption; split doses if >2g.",
         bestForms: "rTG (re-esterified triglyceride) or natural triglyceride forms; IFOS 5-star rated brands for purity.",
@@ -97,7 +97,7 @@ export const supplements = [
         studies: [{year:2022, finding:"16% lower all-cause mortality in supplemented adults (meta 52 trials)", source:"BMJ"}, {year:2024, finding:"Reduced respiratory infection & autoimmune risk", source:"Large RCTs"}, {year:2023, finding:"Falls reduction & improved muscle function in elderly (meta)", source:"JAMA Internal Med"}],
         dosage: "2000–5000 IU daily with K2; test 25(OH)D to target 50–70 ng/mL", synergies: ["vitk2", "magnesium", "omega3", "boron"],
         gorkipedia: "Gorkipedia Entry: The sunshine hormone that became a deficiency disease in the modern world. Receptors exist in almost every tissue. Proper repletion is one of the highest-ROI interventions in preventive medicine, touching immunity, mood, bone, and even DNA repair. Optimal range 50-70 ng/mL balances benefits vs risks; higher not always better.",
-        url: "https://grokipedia.app/vitd",
+        url: "https://grokipedia.com/vitd",
         risks: "Fat-soluble; toxicity rare below 10,000 IU but monitor levels. Pair with K2 to direct calcium. High doses (>10k IU chronic) can cause hypercalcemia, nausea, kidney stones, soft tissue calcification.",
         highDoseRisks: "Doses >10,000 IU/day long-term risk hypercalcemia, vascular calcification (if K2 low), kidney damage, GI symptoms. Always test 25(OH)D; target 50-70 ng/mL, not mega levels. Upper limit ~4,000 IU supplemental for most adults per IOM, though higher used clinically short term under supervision.",
         timing: "Morning or midday with fat-containing meal; consistent daily.",
@@ -109,7 +109,7 @@ export const supplements = [
         studies: [{year:2023, finding:"Lower all-cause mortality with higher dietary Mg (meta 1.1M participants)", source:"Nutrients"}, {year:2024, finding:"Improved sleep latency & muscle function in elderly", source:"RCT"}, {year:2022, finding:"Reduced migraine frequency & anxiety scores (meta)", source:"Headache & Nutrients"}],
         dosage: "300–420 mg elemental (glycinate/threonate best for brain/sleep)", synergies: ["vitd", "taurine", "bcomplex", "ltheanine"],
         gorkipedia: "Gorkipedia Entry: The forgotten mineral whose deficiency is nearly universal in modern diets. Master cofactor for energy, nervous system calm, and hundreds of longevity-relevant enzymes. Glycinate form is the daily driver for most humans seeking better sleep and lower allostatic load. Threonate form crosses BBB better for cognitive applications.",
-        url: "https://grokipedia.app/magnesium",
+        url: "https://grokipedia.com/magnesium",
         risks: "GI upset at very high doses. Reduce if kidney impairment.",
         highDoseRisks: "Supplemental elemental magnesium >350-400 mg/day often causes diarrhea/loose stools (osmotic). In impaired kidney function, risk of hypermagnesemia (low BP, nausea, cardiac issues). Stick to 200-400 mg elemental from glycinate/threonate for daily use.",
         timing: "Evening 1-2h before bed for sleep benefits; split AM/PM if >350mg.",
@@ -121,7 +121,7 @@ export const supplements = [
         studies: [{year:2019, finding:"Significant strength & muscle gains in older adults (meta)", source:"JCM"}, {year:2023, finding:"Improved cognition under stress & in elderly", source:"Multiple RCTs"}, {year:2024, finding:"Reduced frailty markers & improved bone mineral in postmenopausal women", source:"J Bone Miner Metab"}],
         dosage: "5 g daily (no loading needed for longevity use)", synergies: ["protein/collagen", "magnesium", "omega3", "hmb"],
         gorkipedia: "Gorkipedia Entry: Once just for bodybuilders, now recognized as a foundational anti-sarcopenia and brain-health molecule. One of the safest, cheapest, and most evidence-dense supplements in existence. Particularly powerful for women post-menopause and anyone over 50. Vegetarians/vegans often have lower baseline stores and respond robustly.",
-        url: "https://grokipedia.app/creatine",
+        url: "https://grokipedia.com/creatine",
         risks: "Very safe. Minor water retention for some. Stay hydrated.",
         timing: "Any time daily; post-workout with carbs/protein optional for athletes. Consistency > timing.",
         bestForms: "Creapure® micronized monohydrate (most researched & purest). No need for fancy forms.",

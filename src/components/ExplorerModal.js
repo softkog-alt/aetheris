@@ -225,7 +225,7 @@ export class ExplorerModal {
         // Only point to Gorkipedia article (7.3). Prefer explicit node.url on the entry; fallback by id.
         // #10 deep links
         let url = node.grokipediaUrl || node.url;
-        if (!url && node.gorkipedia) url = `https://grokipedia.app/${encodeURIComponent(node.id)}`;
+        if (!url && node.gorkipedia) url = `https://grokipedia.com/${encodeURIComponent(node.id)}`;
         if (!url) url = `https://examine.com/search/?q=${encodeURIComponent(node.name)}`;
         window.open(url, '_blank');
       };

@@ -842,7 +842,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let url = node.grokipediaUrl || node.url;
         if (!url) {
           if (node.gorkipedia) {
-            url = `https://grokipedia.app/${encodeURIComponent(node.id)}`;
+            url = `https://grokipedia.com/${encodeURIComponent(node.id)}`;
           } else {
             // Fallbacks per #10
             url = `https://examine.com/search/?q=${encodeURIComponent(node.name)}`;
