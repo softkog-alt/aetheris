@@ -103,6 +103,9 @@ export class SupplementTree extends BaseTree {
     this._rafPending = false;
     this._rafId = null;
 
+    // Panning mode flag for LOD / simplified rendering during drag
+    this._isPanning = false;
+
     // Fixed screen-space stars for celestial background (normalized coords for natural distribution)
     // Using deterministic hash instead of modulo for non-grid "starfield" look
     this._stars = Array.from({ length: 160 }, (_, i) => {
@@ -113,6 +116,11 @@ export class SupplementTree extends BaseTree {
       const alpha = (h3 < 0.06) ? 0.95 : (h3 < 0.22 ? 0.55 : 0.32);
       return { nx: h1, ny: h2, size, alpha };
     });
+
+    // Offscreen canvas for static background (stars + fill + nebula) to avoid per-frame work
+    this._bgOffscreen = null;
+    this._lastBgW = 0;
+    this._lastBgH = 0;
 
     // Premium color palette for organ groups (harmonious with dark celestial theme)
     // Each organ gets a distinct but elegant color for clear visual grouping
@@ -622,6 +630,8 @@ export class SupplementTree extends BaseTree {
     const panY = v.panY ?? v.scrollY ?? 0;
     const scale = v.scale || 1;
 
+    const isPanning = !!this._isPanning;
+
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -630,28 +640,15 @@ export class SupplementTree extends BaseTree {
     if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
 
     // 1. FIXED screen-space celestial background (stars + nebula)
-    ctx.fillStyle = "#05070f";
-    ctx.fillRect(0, 0, w, h);
-
-    // Starfield — natural distribution, crisp small dots (GitHub stars fix)
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    for (const s of (this._stars || [])) {
-      const sx = s.nx * w;
-      const sy = s.ny * h;
-      ctx.globalAlpha = s.alpha;
-      const sz = s.size;
-      // floor for crisp + min size 1px logical for visibility across DPRs
-      ctx.fillRect((sx | 0), (sy | 0), Math.max(1, sz), Math.max(1, sz));
+    // Use cached offscreen for perf during panning (and always faster)
+    this._ensureBackgroundCache(w, h);
+    if (this._bgOffscreen) {
+      ctx.drawImage(this._bgOffscreen, 0, 0, w, h);
+    } else {
+      // Fallback
+      ctx.fillStyle = "#05070f";
+      ctx.fillRect(0, 0, w, h);
     }
-    ctx.globalAlpha = 1;
-
-    // Subtle nebula (upper area lighter so focus stays on the central body + nodes)
-    const nebula = ctx.createRadialGradient(w * 0.5, h * 0.25, 60, w * 0.5, h * 0.55, 380);
-    nebula.addColorStop(0, "rgba(110, 130, 190, 0.028)");
-    nebula.addColorStop(0.6, "rgba(90, 110, 170, 0.015)");
-    nebula.addColorStop(1, "transparent");
-    ctx.fillStyle = nebula;
-    ctx.fillRect(0, 0, w, h);
 
     // 2. Body-centric layer: body in the middle, nodes clustered around the organs they affect.
     ctx.save();
@@ -685,24 +682,50 @@ export class SupplementTree extends BaseTree {
       api._pngToggleInstalled = true;
     }
 
+    // Culling + simplified rendering during panning for smooth 60fps+ on mobile
+    const margin = 60;
+    const invScale = 1 / scale;
+    const viewHalfW = (w * invScale) / 2;
+    const viewHalfH = (h * invScale) / 2;
+    const worldLeft = panX - viewHalfW - margin;
+    const worldRight = panX + viewHalfW + margin;
+    const worldTop = panY - viewHalfH - margin;
+    const worldBottom = panY + viewHalfH + margin;
+
     visibleNodes.forEach(node => {
-      // visibleNodes already respects enabled groups + maxNodes limit; no extra filter needed
+      // Basic view culling — big win when zoomed or panned
+      if (node.x < worldLeft || node.x > worldRight || node.y < worldTop || node.y > worldBottom) {
+        return;
+      }
 
       const isSelected = this.selectedId === node.id;
       const isHovered = this.hoveredId === node.id;
       const isHighlighted = highlightIds.includes(node.id);
-      const isDimmed = false;
 
-      // Use the node's calculated radius as the base (this is what gives different sizes)
       const baseRadius = node.radius || 18;
-      let r = isSelected || isHovered ? baseRadius * 1.18 : baseRadius;
+      let r = (isSelected || isHovered) && !isPanning ? baseRadius * 1.18 : baseRadius;
 
-      // Compute early to avoid TDZ (was causing ReferenceError on every draw)
-      const isHighValue = node.vitality > 82;
       const groupColor = this._getNodeColor(node);
+
+      if (isPanning) {
+        // Ultra fast path for dragging: minimal state changes, no gradients, no shadows, no text
+        ctx.fillStyle = groupColor;
+        ctx.strokeStyle = isSelected || isHighlighted ? "#f4e9c8" : "#ffffff";
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        return;
+      }
+
+      // Full quality path (used for hover, click, zoom settle, tree switches)
+      const isDimmed = false;
+      const isHighValue = node.vitality > 82;
       const glowColor = groupColor;
 
-      // Glow layers — tinted by the node's organ group for clear visual clustering
+      // Glow layers
       if (isSelected || isHighlighted) {
         ctx.shadowBlur = 28;
         ctx.shadowColor = glowColor;
@@ -714,11 +737,8 @@ export class SupplementTree extends BaseTree {
         ctx.shadowColor = glowColor;
       }
 
-      // Outer ring - stronger for high vitality nodes (body cluster emphasis)
       ctx.strokeStyle = isSelected || isHighlighted ? "#d4af37" : (isHighValue ? "#d4af37" : "#67e8f9");
       ctx.lineWidth = isSelected ? 4.5 : (isHovered ? 3.2 : (isHighValue ? 3.0 : 2.0));
-
-      // === Premium Node Design with Group Color (clear differentiation by supplement group) ===
 
       ctx.fillStyle = isDimmed ? "#1f2437" : "#0f1424";
 
@@ -743,24 +763,20 @@ export class SupplementTree extends BaseTree {
 
       ctx.shadowBlur = 0;
 
-      // Use the organ group color for the outer ring — this is the key for visual grouping
       ctx.strokeStyle = isSelected || isHighlighted ? "#f4e9c8" : groupColor;
       ctx.lineWidth = isSelected ? 4.8 : (isHovered ? 3.8 : 2.8);
       ctx.beginPath();
       ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Inner ring detail
       ctx.strokeStyle = isHighValue ? "rgba(212,175,55,0.75)" : "rgba(255,255,255,0.3)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(node.x, node.y, r - 5.2, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Scores inside node: vitality (top), L / Q (base corners)
       this._drawNodeScoreTriangle(ctx, node, r, { isDimmed, isSelected, isHighValue });
 
-      // Short label above the node
       const labelSize = Math.round(Math.max(8, Math.min(11, r * 0.38)));
       ctx.fillStyle = isDimmed ? "#6b7280" : (isSelected ? "#f4e9c8" : "#e5e7eb");
       ctx.font = `${isSelected ? 700 : 600} ${labelSize}px Inter, system-ui, sans-serif`;
@@ -768,12 +784,11 @@ export class SupplementTree extends BaseTree {
       ctx.textBaseline = "bottom";
       ctx.fillText(node.short, node.x, node.y - r - 4);
 
-      // Visual reference in map for supplements with documented high-dose risks (warning indicator)
       if (node.highDoseRisks) {
         const warnSize = Math.max(6, Math.min(9, r * 0.22));
         const wx = node.x + r * 0.65;
         const wy = node.y - r * 0.65;
-        ctx.fillStyle = '#f59e0b'; // amber warning
+        ctx.fillStyle = '#f59e0b';
         ctx.beginPath();
         ctx.moveTo(wx, wy - warnSize);
         ctx.lineTo(wx - warnSize * 0.9, wy + warnSize * 0.6);
@@ -1452,30 +1467,35 @@ export class SupplementTree extends BaseTree {
       const oh = img.naturalHeight * thisScale;
 
       if (isAct) {
-        // --- Shaped glow that follows the PNG's actual outline (the important part) ---
-        // We draw the image itself with a shadow. The browser's shadow respects the PNG alpha,
-        // so the glow takes on the real shape of the organ instead of a round blob.
-        const shapedBlur = SupplementTree.PNG_GLOW_SHAPED_BLUR ?? 22;
-        const shapedAlpha = SupplementTree.PNG_GLOW_SHAPED_STRENGTH ?? 0.48;
-        const enlarge = SupplementTree.PNG_GLOW_SHAPED_ENLARGE ?? 1.12;
+        // Skip expensive shaped shadows/glows entirely while panning
+        if (!this._isPanning) {
+          // --- Shaped glow that follows the PNG's actual outline (the important part) ---
+          // We draw the image itself with a shadow. The browser's shadow respects the PNG alpha,
+          // so the glow takes on the real shape of the organ instead of a round blob.
+          const shapedBlur = SupplementTree.PNG_GLOW_SHAPED_BLUR ?? 22;
+          const shapedAlpha = SupplementTree.PNG_GLOW_SHAPED_STRENGTH ?? 0.48;
+          const enlarge = SupplementTree.PNG_GLOW_SHAPED_ENLARGE ?? 1.12;
 
-        ctx.save();
-        ctx.shadowColor = col;
-        ctx.shadowBlur = shapedBlur;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        ctx.globalAlpha = shapedAlpha;
+          ctx.save();
+          ctx.shadowColor = col;
+          ctx.shadowBlur = shapedBlur;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.globalAlpha = shapedAlpha;
 
-        const gw = ow * enlarge;
-        const gh = oh * enlarge;
-        ctx.drawImage(img, ax - gw / 2, ay - gh / 2, gw, gh);
-        ctx.restore();
+          const gw = ow * enlarge;
+          const gh = oh * enlarge;
+          ctx.drawImage(img, ax - gw / 2, ay - gh / 2, gw, gh);
+          ctx.restore();
 
-        // Optional classic round "energy" halo on top of the shaped one (toggleable)
-        if (SupplementTree.PNG_GLOW_CIRCULAR) {
-          const glowR = Math.max(ow, oh) * 0.38;
-          this._drawOrganGlow(ctx, ax, ay, glowR, col, true);
+          // Optional classic round "energy" halo on top of the shaped one (toggleable)
+          if (SupplementTree.PNG_GLOW_CIRCULAR) {
+            const glowR = Math.max(ow, oh) * 0.38;
+            this._drawOrganGlow(ctx, ax, ay, glowR, col, true);
+          }
         }
+
+        // Still draw the actual organ PNG even while panning
       }
 
       // The actual organ PNG.
@@ -1655,6 +1675,44 @@ export class SupplementTree extends BaseTree {
       this._rafId = null;
       this.draw();
     });
+  }
+
+  /** Pre-render static background (solid + stars + nebula) to offscreen canvas (logical size). */
+  _ensureBackgroundCache(w, h) {
+    const needsRecreate = !this._bgOffscreen || Math.abs(this._lastBgW - w) > 1 || Math.abs(this._lastBgH - h) > 1;
+    if (!needsRecreate) return;
+
+    // Offscreen at logical resolution; main draw ctx.scale(dpr) will handle crispness
+    this._bgOffscreen = document.createElement('canvas');
+    this._bgOffscreen.width = Math.max(1, Math.round(w));
+    this._bgOffscreen.height = Math.max(1, Math.round(h));
+    const bgCtx = this._bgOffscreen.getContext('2d', { alpha: true });
+
+    // Solid dark
+    bgCtx.fillStyle = "#05070f";
+    bgCtx.fillRect(0, 0, w, h);
+
+    // Stars (pre-drawn)
+    bgCtx.fillStyle = "rgba(255,255,255,0.9)";
+    for (const s of (this._stars || [])) {
+      const sx = s.nx * w;
+      const sy = s.ny * h;
+      bgCtx.globalAlpha = s.alpha;
+      const sz = Math.max(1, s.size);
+      bgCtx.fillRect((sx | 0), (sy | 0), sz, sz);
+    }
+    bgCtx.globalAlpha = 1;
+
+    // Nebula
+    const nebula = bgCtx.createRadialGradient(w * 0.5, h * 0.25, 60, w * 0.5, h * 0.55, 380);
+    nebula.addColorStop(0, "rgba(110, 130, 190, 0.028)");
+    nebula.addColorStop(0.6, "rgba(90, 110, 170, 0.015)");
+    nebula.addColorStop(1, "transparent");
+    bgCtx.fillStyle = nebula;
+    bgCtx.fillRect(0, 0, w, h);
+
+    this._lastBgW = w;
+    this._lastBgH = h;
   }
 
   scroll(dx) {

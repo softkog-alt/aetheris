@@ -95,6 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (window.AETHERIS?.bottomSheet) window.AETHERIS.bottomSheet.close(true);
 
     if (treeInstance) {
+      treeInstance._isPanning = false;
       treeInstance.dispose();
     }
 
@@ -366,18 +367,21 @@ document.addEventListener("DOMContentLoaded", () => {
       cancelAnimationFrame(inertiaId);
       inertiaId = null;
     }
+    if (treeInstance) treeInstance._isPanning = false;
     lastPanDx = 0;
     lastPanDy = 0;
   }
 
   function startInertia(vx, vy) {
     stopInertia();
+    if (treeInstance) treeInstance._isPanning = true;
     let curVx = vx * 1.4;
     let curVy = vy * 1.4;
     const friction = 0.90;
     const minVel = 0.25;
     const step = () => {
       if (Math.abs(curVx) < minVel && Math.abs(curVy) < minVel) {
+        if (treeInstance) treeInstance._isPanning = false;
         inertiaId = null;
         return;
       }
@@ -402,6 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
     stopInertia();
     pointerDown = true;
     isPanning = false;
+    if (treeInstance) treeInstance._isPanning = false;
     downX = lastX = e.clientX;
     downY = lastY = e.clientY;
     lastPanDx = 0;
@@ -417,6 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
     if (!isPanning && moved > DRAG_THRESHOLD) {
       isPanning = true;
+      if (treeInstance) treeInstance._isPanning = true;
       hoverPopup.hide();
       canvas.style.cursor = 'grabbing';
     }
@@ -453,6 +459,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     pointerDown = false;
     isPanning = false;
+    if (treeInstance) treeInstance._isPanning = false;
     activePointerId = null;
     try { if (e && e.pointerId) canvas.releasePointerCapture(e.pointerId); } catch (_) {}
     canvas.style.cursor = 'grab';
@@ -484,6 +491,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isPanning) suppressNextClick = true;
     pointerDown = false;
     isPanning = false;
+    if (treeInstance) treeInstance._isPanning = false;
     canvas.style.cursor = 'grab';
   });
 
