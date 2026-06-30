@@ -15,13 +15,14 @@ Refactored multi-file version of the original single-file AETHERIS experience.
 
 **Keyboard:** `Esc` reset · `+`/`-` zoom · `r` recenter · `f` show all groups
 
-Run with `npm run dev` (recommended) or open `index.html` directly.
-
+**Development (recommended):**
 ```bash
 cd aetheris
 npm install
 npm run dev
 ```
+
+> **Note:** Do not open `index.html` directly in a browser. The project uses Vite + ES module imports (including CSS). Use `npm run dev` (or `npm run build && npm run preview`) instead. Direct file:// or raw static serving will fail to load modules correctly.
 
 ## Architecture
 
@@ -45,27 +46,36 @@ npm run preview
 
 ## Deployment on GitHub Pages
 
-This project is now configured for **automatic deployment** to GitHub Pages.
+This project is hosted on GitHub Pages at: **https://markmarvik.github.io/aetheris/**
 
-**Live URL:** https://markmarvik.github.io/aetheris/
+The site uses a production `base` of `/aetheris/` so all JS, CSS, and asset URLs (including body PNG layers) are correct for the sub-path.
 
-### How it works
-- Every push to the `main` branch triggers a GitHub Actions workflow.
-- The workflow installs dependencies, runs `npm run build` (Vite production bundle), and deploys the `dist/` folder.
-- `vite.config.js` includes `base: '/aetheris/'` so all JS/CSS/asset paths resolve correctly under the repository subpath.
-- `public/.nojekyll` prevents GitHub's Jekyll processor from interfering with the static files.
+### Requirements
+- **Node.js 24+** (enforced via `package.json#engines` and `.nvmrc`)
+- `npm install`
 
-### Setup (one-time)
-1. Go to the repository **Settings > Pages**.
-2. Under "Build and deployment", select **Source: GitHub Actions** (if it shows "Deploy from a branch", change it).
-3. Save. The first deployment will happen automatically on the next push (or trigger the workflow manually from the **Actions** tab).
+> **Note:** Do not open `index.html` directly. Use `npm run dev` or the built `dist/`.
 
-The site should be live within 1-2 minutes after the workflow completes. Future pushes will redeploy automatically.
-
-You can test the production build locally anytime with:
+### Local production build
 ```bash
-npm run build && npm run preview
+npm run build
+npm run preview
 ```
+
+### GitHub Pages Deployment
+A GitHub Actions workflow builds the project with **Node 24** on every push to `main` and deploys only the `dist/` folder.
+
+- `vite.config.js` sets the correct base for the `/aetheris/` subpath.
+- `public/.nojekyll` is present to prevent Jekyll processing.
+- Workflow uses `actions/setup-node` (v24), `npm ci`, `npm run build`, and the official `actions/deploy-pages`.
+
+**One-time setup in the GitHub repo UI:**
+1. Go to **Settings → Pages**
+2. Under "Build and deployment", set **Source** to **GitHub Actions**
+
+After the setting change, push to `main` (or run the workflow manually from the Actions tab). The site should update within a couple of minutes.
+
+All built assets (JS modules, CSS, body PNGs) are emitted under `/aetheris/assets/...`.
 
 ## Roadmap
 

@@ -336,7 +336,9 @@ export class SupplementTree extends BaseTree {
   }
 
   _loadBodyAssets() {
-    const base = '/assets/body';
+    // Use import.meta.env.BASE_URL so GitHub Pages (/aetheris/) + local dev both resolve PNGs correctly.
+    // Vite injects the production base during build; dev uses '/'.
+    const base = import.meta.env.BASE_URL + 'assets/body';
     const pending = [];
 
     // Body bases (gender aware)
