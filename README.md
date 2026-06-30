@@ -43,6 +43,30 @@ npm run build   # output in dist/
 npm run preview
 ```
 
+## Deployment on GitHub Pages
+
+This project is now configured for **automatic deployment** to GitHub Pages.
+
+**Live URL:** https://markmarvik.github.io/aetheris/
+
+### How it works
+- Every push to the `main` branch triggers a GitHub Actions workflow.
+- The workflow installs dependencies, runs `npm run build` (Vite production bundle), and deploys the `dist/` folder.
+- `vite.config.js` includes `base: '/aetheris/'` so all JS/CSS/asset paths resolve correctly under the repository subpath.
+- `public/.nojekyll` prevents GitHub's Jekyll processor from interfering with the static files.
+
+### Setup (one-time)
+1. Go to the repository **Settings > Pages**.
+2. Under "Build and deployment", select **Source: GitHub Actions** (if it shows "Deploy from a branch", change it).
+3. Save. The first deployment will happen automatically on the next push (or trigger the workflow manually from the **Actions** tab).
+
+The site should be live within 1-2 minutes after the workflow completes. Future pushes will redeploy automatically.
+
+You can test the production build locally anytime with:
+```bash
+npm run build && npm run preview
+```
+
 ## Roadmap
 
 - Touch/pointer pan for mobile
