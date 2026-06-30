@@ -17,7 +17,7 @@ import { HabitsTree } from "./trees/HabitsTree.js";
 import { ExerciseTree } from "./trees/ExerciseTree.js";
 import { FoodsTree } from "./trees/FoodsTree.js";
 import { EnvironmentTree } from "./trees/EnvironmentTree.js";
-import { BloodTree } from "./trees/BloodTree.js";
+import { BiomarkerTree } from "./trees/BiomarkerTree.js";
 import { HoverPopup } from "./components/HoverPopup.js";
 import { ExplorerModal } from "./components/ExplorerModal.js";
 import { BottomSheet } from "./components/BottomSheet.js";
@@ -71,6 +71,21 @@ document.addEventListener("DOMContentLoaded", () => {
     return window.innerWidth < 768 || (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
   }
 
+  function isEventOverBottomSheet(e) {
+    // Prevent global tap-to-select / close logic from firing when user interacts with the mobile inspector sheet.
+    // Fixes collapse on tap inside content (Issues #15, #18).
+    if (!e || !e.clientX || !e.clientY) return false;
+    const sheet = document.getElementById('mobile-bottom-sheet');
+    if (!sheet || sheet.classList.contains('hidden')) return false;
+    const rect = sheet.getBoundingClientRect();
+    return (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    );
+  }
+
   // === Initialize Components ===
   const hoverPopup = new HoverPopup().init();
   const explorerModal = new ExplorerModal().init();
@@ -114,7 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const isExercises = type === 'exercises';
     const isFoods = type === 'foods';
     const isEnvironment = type === 'environment';
-    const isBlood = type === 'blood';
+    const isBlood = type === 'biomarkers';
 
     // Create the right tree class
     if (isSupplements) {
@@ -142,10 +157,10 @@ document.addEventListener("DOMContentLoaded", () => {
       validateTreeData(environment, 'environment');
       window.AETHERIS.categories = environmentCategories;
     } else if (isBlood) {
-      treeInstance = new BloodTree(canvas);
+      treeInstance = new BiomarkerTree(canvas);
       bindTreeViewport(treeInstance);
       treeInstance.loadData(blood);
-      validateTreeData(blood, 'blood');
+      validateTreeData(blood, 'biomarkers');
       window.AETHERIS.categories = bloodCategories;
     } else {
       treeInstance = new HabitsTree(canvas);
@@ -170,7 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Clear detail panel
     if (detailPanel) {
-      const label = isBlood ? 'blood' : (isEnvironment ? 'environment' : (isFoods ? 'foods' : (isExercises ? 'exercises' : (isSupplements ? 'supplements' : 'habits'))));
+      const label = isBlood ? 'biomarkers' : (isEnvironment ? 'environment' : (isFoods ? 'foods' : (isExercises ? 'exercises' : (isSupplements ? 'supplements' : 'habits'))));
       detailPanel.innerHTML = `<div class="text-white/60">Select a node on the ${label} map</div>`;
     }
 
@@ -185,13 +200,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const exBtn = document.getElementById('btn-constellation-exercises');
     const foodBtn = document.getElementById('btn-constellation-foods');
     const envBtn = document.getElementById('btn-constellation-environment');
-    const bloodBtn = document.getElementById('btn-constellation-blood');
+    const bloodBtn = document.getElementById('btn-constellation-biomarkers');
     if (supBtn) supBtn.classList.toggle('active', activeType === 'supplements');
     if (habBtn) habBtn.classList.toggle('active', activeType === 'habits');
     if (exBtn) exBtn.classList.toggle('active', activeType === 'exercises');
     if (foodBtn) foodBtn.classList.toggle('active', activeType === 'foods');
     if (envBtn) envBtn.classList.toggle('active', activeType === 'environment');
-    if (bloodBtn) bloodBtn.classList.toggle('active', activeType === 'blood');
+    if (bloodBtn) bloodBtn.classList.toggle('active', activeType === 'biomarkers');
   }
 
   function renderGroupFilters() {
@@ -375,7 +390,19 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof treeInstance.computeLayout === 'function') treeInstance.computeLayout();
       treeInstance.draw();
     }
+
+    // Hide loading overlay now that first render + resize is done (Issue #17)
+    hideLoadingOverlay();
   });
+
+  function hideLoadingOverlay() {
+    const overlay = document.getElementById('loading-overlay');
+    if (!overlay) return;
+    overlay.style.opacity = '0';
+    setTimeout(() => {
+      if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }, 320);
+  }
 
   // === Map Interaction (Pan + Zoom) - unified pointer events + RAF + inertia (GitHub #12) ===
   const DRAG_THRESHOLD = 5;
@@ -559,7 +586,9 @@ document.addEventListener("DOMContentLoaded", () => {
       canvas.style.cursor = 'grab';
 
       // Tap-to-select for touch/pen when not panned or pinched
+      // Guard: ignore if the pointer landed inside the mobile bottom sheet (Issues #15/#18)
       if (!wasPanning && !wasPinching && e && (e.pointerType === 'touch' || e.pointerType === 'pen') && e.clientX != null) {
+        if (isEventOverBottomSheet(e)) return;
         const fake = { clientX: e.clientX, clientY: e.clientY };
         const { x: mx, y: my } = canvasPointer(fake);
         const hit = treeInstance.getNodeAt(mx, my);
@@ -605,17 +634,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const exBtn = document.getElementById('btn-constellation-exercises');
   const foodBtn = document.getElementById('btn-constellation-foods');
   const envBtn = document.getElementById('btn-constellation-environment');
-  const bloodBtn = document.getElementById('btn-constellation-blood');
+  const bloodBtn = document.getElementById('btn-constellation-biomarkers');
 
   if (supBtn) supBtn.onclick = () => switchConstellation('supplements');
   if (habBtn) habBtn.onclick = () => switchConstellation('habits');
   if (exBtn) exBtn.onclick = () => switchConstellation('exercises');
   if (foodBtn) foodBtn.onclick = () => switchConstellation('foods');
   if (envBtn) envBtn.onclick = () => switchConstellation('environment');
-  if (bloodBtn) bloodBtn.onclick = () => switchConstellation('blood');
+  if (bloodBtn) bloodBtn.onclick = () => switchConstellation('biomarkers');
 
   // Mark initial active state
   updateConstellationButtons('supplements');
+
+  // Ensure the blood button label and logic uses 'biomarkers' key (Issue #14 refactor)
+  // Keep DOM id for now to minimize HTML changes; text can be updated in HTML separately if desired.
 
   // Shared inspector renderer used by BOTH the desktop left panel AND the mobile bottom sheet (Issue #1).
   // Keeps all the rich content (mechanisms, personal impact, clickable organs, share, risks, "Read full", etc.) in one place.
@@ -859,7 +891,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateDetail(node) {
     if (!detailPanel) return;
     if (!node) {
-      const label = currentTreeType === 'blood' ? 'blood' : (currentTreeType === 'environment' ? 'environment' : (currentTreeType === 'habits' ? 'habits' : (currentTreeType === 'exercises' ? 'exercises' : (currentTreeType === 'foods' ? 'foods' : 'supplements'))));
+      const label = currentTreeType === 'biomarkers' ? 'biomarkers' : (currentTreeType === 'environment' ? 'environment' : (currentTreeType === 'habits' ? 'habits' : (currentTreeType === 'exercises' ? 'exercises' : (currentTreeType === 'foods' ? 'foods' : 'supplements'))));
       detailPanel.innerHTML = `<div class="text-white/60">Select a node on the ${label} map</div>`;
       return;
     }
@@ -878,8 +910,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (mobile && bs) {
         const same = bs.getCurrentNodeId() === node.id;
-        if (same && bs.getMode() === 'preview') {
-          bs.expand();
+        const currentMode = bs.getMode();
+
+        if (same) {
+          // Toggle behavior for repeated taps on same node (fixes double-tap disappear + #15/#18)
+          if (currentMode === 'preview') {
+            bs.expand();
+          } else if (currentMode === 'expanded') {
+            bs.close(true);
+          } else {
+            bs.showPreview(node);
+          }
         } else {
           bs.showPreview(node);
         }
@@ -1246,6 +1287,9 @@ document.addEventListener("DOMContentLoaded", () => {
       suppressNextClick = false;
       return;
     }
+
+    // On mobile, ignore clicks that hit the bottom sheet overlay
+    if (isEventOverBottomSheet(e)) return;
 
     const { x: mx, y: my } = canvasPointer(e);
     const hit = treeInstance.getNodeAt(mx, my);

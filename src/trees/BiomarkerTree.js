@@ -1,20 +1,22 @@
 /**
- * BloodTree
+ * BiomarkerTree
  *
- * Blood biomarker constellation inspired by Bryan Johnson Blueprint.
+ * Biomarker constellation (blood + urine + future) inspired by Bryan Johnson Blueprint / Siim Land.
  * Reuses core layout, rendering, interaction, and body integration from SupplementTree.
  *
- * Nodes represent blood markers. Placed near relevant organs where possible.
+ * Nodes represent biomarkers across specimen types. Placed near relevant organs where possible.
  * Display shows current value (or key metric) + color by status (optimal/sub/high-risk).
  * Age predictor impact used for sizing/importance (higher impact = larger, closer in layout).
  *
  * Inspector shows rich details: ranges, age impact, risks, links to other constellations.
+ *
+ * See GitHub Issue #14 for the rename + multi-specimen vision.
  */
 
 import { SupplementTree } from "./SupplementTree.js";
 import { computeBloodScore } from "../data/blood.js";
 
-export class BloodTree extends SupplementTree {
+export class BiomarkerTree extends SupplementTree {
   constructor(canvas, options = {}) {
     super(canvas, options);
 

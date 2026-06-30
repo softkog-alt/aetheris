@@ -63,6 +63,17 @@ export class BottomSheet {
 
     this._attachDrag();
 
+    // Protect content areas from bubbling to canvas/global handlers (fixes tap-collapse inside inspector, #15/#18)
+    const stopBubble = (e) => e.stopPropagation();
+    if (this.previewEl) {
+      this.previewEl.addEventListener('click', stopBubble, true);
+      this.previewEl.addEventListener('pointerdown', stopBubble, { passive: true, capture: true });
+    }
+    if (this.fullEl) {
+      this.fullEl.addEventListener('click', stopBubble, true);
+      this.fullEl.addEventListener('pointerdown', stopBubble, { passive: true, capture: true });
+    }
+
     // Start fully closed
     this._setHeight(0, true);
     this.sheetEl.classList.add('hidden');
@@ -218,9 +229,20 @@ export class BottomSheet {
   _attachDrag() {
     if (!this.handleEl || !this.sheetEl) return;
 
+    // Drag can start from handle OR the header area (per Issue #18) but NOT from content.
+    // This keeps content scrollable/draggable only for its own scroll.
+    const header = this.sheetEl.querySelector('.border-b');
+
     const onDown = (e) => {
       // Only primary pointer
       if (e.button != null && e.button !== 0) return;
+
+      // Ensure we only drag when starting on allowed drag zones
+      const target = e.target;
+      const isHandle = this.handleEl && (target === this.handleEl || this.handleEl.contains(target));
+      const isHeader = header && (target === header || header.contains(target));
+      if (!isHandle && !isHeader) return;
+
       e.preventDefault();
 
       const rect = this.sheetEl.getBoundingClientRect();
@@ -279,18 +301,27 @@ export class BottomSheet {
     };
 
     // Pointer events (unifies mouse + touch)
+    // Attach down to handle + header so drag works from the top bar (Issue #18)
     this.handleEl.addEventListener('pointerdown', onDown, { passive: false });
+    if (header) {
+      header.addEventListener('pointerdown', onDown, { passive: false });
+    }
     window.addEventListener('pointermove', onMove, { passive: false });
     window.addEventListener('pointerup', onUp, { passive: false });
     window.addEventListener('pointercancel', onUp, { passive: false });
 
     // Fallbacks for pure touch (some browsers)
-    this.handleEl.addEventListener('touchstart', (e) => {
-      // We let pointerdown handle most, but ensure we have a starting point
-      if (!this._dragState && e.touches && e.touches.length) {
-        const fake = { clientY: e.touches[0].clientY, button: 0, pointerId: 1, preventDefault: () => {} };
-        onDown(fake);
-      }
-    }, { passive: false });
+    const attachTouchStart = (el) => {
+      if (!el) return;
+      el.addEventListener('touchstart', (e) => {
+        // We let pointerdown handle most, but ensure we have a starting point
+        if (!this._dragState && e.touches && e.touches.length) {
+          const fake = { clientY: e.touches[0].clientY, button: 0, pointerId: 1, preventDefault: () => {} };
+          onDown(fake);
+        }
+      }, { passive: false });
+    };
+    attachTouchStart(this.handleEl);
+    attachTouchStart(header);
   }
 }
