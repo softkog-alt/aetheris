@@ -210,7 +210,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderGroupFilters() {
-    const container = document.getElementById('group-filters');
+    const mobile = isMobileViewport();
+    const container = mobile
+      ? document.getElementById('mobile-group-filters')
+      : document.getElementById('group-filters');
     if (!container || !treeInstance) return;
 
     const cats = (window.AETHERIS.categories || []).filter(c => c.key !== 'all');
@@ -218,7 +221,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const allBtn = document.createElement('button');
     allBtn.type = 'button';
-    allBtn.className = 'group-chip px-2.5 py-1 text-[10px] rounded-xl border border-amber-400/50 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25 transition font-semibold tracking-wide';
+    if (mobile) {
+      allBtn.className = 'group-chip w-full text-left px-2 py-1 text-xs rounded-lg border border-amber-400/50 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25 transition font-semibold tracking-wide';
+    } else {
+      allBtn.className = 'group-chip px-2.5 py-1 text-[10px] rounded-xl border border-amber-400/50 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25 transition font-semibold tracking-wide';
+    }
     allBtn.textContent = 'ALL';
     allBtn.onclick = () => {
       // #4: toggleAllGroups (implemented in SupplementTree) turns ALL off when everything is already on.
@@ -239,7 +246,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.key = cat.key;
-      btn.className = 'group-chip px-2.5 py-1 text-[10px] rounded-xl border transition flex items-center gap-1 font-medium tracking-wide';
+      if (mobile) {
+        btn.className = 'group-chip w-full flex items-center gap-1 px-2 py-1 text-xs rounded-lg border transition font-medium tracking-wide';
+      } else {
+        btn.className = 'group-chip px-2.5 py-1 text-[10px] rounded-xl border transition flex items-center gap-1 font-medium tracking-wide';
+      }
       btn.innerHTML = `<i class="fa-solid ${cat.icon} opacity-80"></i><span>${cat.label}</span>`;
       btn.onclick = () => {
         treeInstance.toggleGroup(cat.key);
@@ -255,36 +266,46 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function syncGroupFilterChips() {
-    const container = document.getElementById('group-filters');
-    if (!container || !treeInstance) return;
-    container.querySelectorAll('.group-chip[data-key]').forEach(btn => {
-      const on = treeInstance.isGroupEnabled(btn.dataset.key);
-      btn.classList.toggle('border-white/25', on);
-      btn.classList.toggle('bg-white/10', on);
-      btn.classList.toggle('text-white/90', on);
-      btn.classList.toggle('border-white/10', !on);
-      btn.classList.toggle('bg-[#0a0d1a]/60', !on);
-      btn.classList.toggle('text-white/35', !on);
-      btn.classList.toggle('line-through', !on);
-    });
+    const containers = [
+      document.getElementById('group-filters'),
+      document.getElementById('mobile-group-filters')
+    ].filter(Boolean);
 
-    // Sync ALL chip state (amber when all explicitly on; dim/partial when mixed; line-through when all-off for quick-reset)
-    const allBtn = container.querySelector('.group-chip:not([data-key])');
-    if (allBtn) {
-      const cats = (window.AETHERIS.categories || []).filter(c => c.key !== 'all');
-      const total = cats.length;
-      const onCount = cats.filter(c => treeInstance.isGroupEnabled(c.key)).length;
-      const allOn = total > 0 && onCount === total;
-      const noneOn = (treeInstance.enabledGroups?.size || 0) === 0;
-      if (allOn) {
-        allBtn.className = 'group-chip px-2.5 py-1 text-[10px] rounded-xl border border-amber-400/50 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25 transition font-semibold tracking-wide';
-      } else if (noneOn) {
-        allBtn.className = 'group-chip px-2.5 py-1 text-[10px] rounded-xl border border-white/10 bg-[#0a0d1a]/60 text-white/35 hover:bg-white/10 transition font-semibold tracking-wide line-through';
-      } else {
-        // partial selection
-        allBtn.className = 'group-chip px-2.5 py-1 text-[10px] rounded-xl border border-amber-400/30 bg-amber-400/5 text-amber-200/70 hover:bg-amber-400/15 transition font-semibold tracking-wide';
+    containers.forEach(container => {
+      if (!treeInstance) return;
+      container.querySelectorAll('.group-chip[data-key]').forEach(btn => {
+        const on = treeInstance.isGroupEnabled(btn.dataset.key);
+        btn.classList.toggle('border-white/25', on);
+        btn.classList.toggle('bg-white/10', on);
+        btn.classList.toggle('text-white/90', on);
+        btn.classList.toggle('border-white/10', !on);
+        btn.classList.toggle('bg-[#0a0d1a]/60', !on);
+        btn.classList.toggle('text-white/35', !on);
+        btn.classList.toggle('line-through', !on);
+      });
+
+      // Sync ALL chip state. Use mobile-appropriate base classes when targeting the vertical container.
+      const allBtn = container.querySelector('.group-chip:not([data-key])');
+      if (allBtn) {
+        const isMob = container.id === 'mobile-group-filters';
+        const base = isMob
+          ? 'group-chip w-full text-left px-2 py-1 text-xs rounded-lg border transition font-semibold tracking-wide'
+          : 'group-chip px-2.5 py-1 text-[10px] rounded-xl border transition font-semibold tracking-wide';
+        const cats = (window.AETHERIS.categories || []).filter(c => c.key !== 'all');
+        const total = cats.length;
+        const onCount = cats.filter(c => treeInstance.isGroupEnabled(c.key)).length;
+        const allOn = total > 0 && onCount === total;
+        const noneOn = (treeInstance.enabledGroups?.size || 0) === 0;
+        if (allOn) {
+          allBtn.className = base + ' border-amber-400/50 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25';
+        } else if (noneOn) {
+          allBtn.className = base + ' border-white/10 bg-[#0a0d1a]/60 text-white/35 hover:bg-white/10 line-through';
+        } else {
+          // partial selection
+          allBtn.className = base + ' border-amber-400/30 bg-amber-400/5 text-amber-200/70 hover:bg-amber-400/15';
+        }
       }
-    }
+    });
   }
 
   function rewireMapControls() {
@@ -297,10 +318,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnRecenter) btnRecenter.onclick = () => { stopInertia && stopInertia(); treeInstance && treeInstance.recenter(); };
   }
 
-  // Node Limit slider (UPGRADE 2.1): top N by vitality (in bottom bar above filters).
+  // Node Limit slider (UPGRADE 2.1): top N by vitality (desktop bottom bar; compact on mobile under right controls).
   // 0 = unlimited (shows all after group filters). Slider lets focus on most impactful without overload.
   function renderNodeLimitControl() {
-    const mount = document.getElementById('node-limit-control');
+    const mobile = isMobileViewport();
+    const mount = mobile
+      ? document.getElementById('mobile-node-limit-control')
+      : document.getElementById('node-limit-control');
     if (!mount || !treeInstance) return;
     // Clean any legacy absolute wrap from previous layout
     const legacy = document.getElementById('node-limit-wrap');
@@ -308,14 +332,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const current = treeInstance.maxNodes || 0;
     const val = current > 0 ? current : 80;
-    mount.innerHTML = `
-      <div class="flex items-center gap-2">
-        <span class="uppercase tracking-[1px] text-white/50">TOP</span>
-        <input id="node-limit-range" type="range" min="5" max="150" step="5" value="${val}" class="w-28 accent-amber-400">
-        <span id="node-limit-val" class="font-mono w-8 text-amber-300">${current > 0 ? current : 'ALL'}</span>
-        <button id="node-limit-all" class="px-2 py-0.5 rounded-xl border text-[9px] border-amber-400/40 hover:bg-amber-400/10 text-amber-300/80">ALL</button>
-      </div>
-    `;
+
+    if (mobile) {
+      // Vertical layout for max slider width: header row (TOP + value + ALL) above the full-width slider.
+      mount.innerHTML = `
+        <div class="flex flex-col gap-1 w-full">
+          <div class="flex items-center justify-between w-full">
+            <span class="uppercase tracking-[1px] text-white/50 text-xs">TOP</span>
+            <div class="flex items-center gap-x-1.5">
+              <span id="node-limit-val" class="font-mono text-amber-300 text-sm">${current > 0 ? current : 'ALL'}</span>
+              <button id="node-limit-all" class="px-2 py-0.5 rounded-lg border text-[9px] border-amber-400/40 hover:bg-amber-400/10 text-amber-300/80">ALL</button>
+            </div>
+          </div>
+          <input id="node-limit-range" type="range" min="5" max="150" step="5" value="${val}" class="w-full accent-amber-400">
+        </div>
+      `;
+    } else {
+      mount.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="uppercase tracking-[1px] text-white/50">TOP</span>
+          <input id="node-limit-range" type="range" min="5" max="150" step="5" value="${val}" class="w-28 accent-amber-400">
+          <span id="node-limit-val" class="font-mono w-8 text-amber-300">${current > 0 ? current : 'ALL'}</span>
+          <button id="node-limit-all" class="px-2 py-0.5 rounded-xl border text-[9px] border-amber-400/40 hover:bg-amber-400/10 text-amber-300/80">ALL</button>
+        </div>
+      `;
+    }
+
     const range = mount.querySelector('#node-limit-range');
     const valEl = mount.querySelector('#node-limit-val');
     const allBtn = mount.querySelector('#node-limit-all');
@@ -645,6 +687,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Mark initial active state
   updateConstellationButtons('supplements');
+
+  // Wire mobile-only expandable vertical filters toggle (right column under selector)
+  const mobileFiltersToggle = document.getElementById('mobile-filters-toggle');
+  const mobileFiltersPanel = document.getElementById('mobile-group-filters');
+  const mobileFiltersIcon = document.getElementById('mobile-filters-icon');
+  const rightControls = document.getElementById('right-map-controls');
+  if (mobileFiltersToggle && mobileFiltersPanel) {
+    mobileFiltersToggle.onclick = () => {
+      const nowHidden = mobileFiltersPanel.classList.toggle('hidden');
+      if (!nowHidden) {
+        // Expand the vertical filter list almost full screen height, leaving ~5-10% bottom spacing.
+        // Compute from actual viewport so the list reaches near the bottom from the top-right position.
+        const vh = Math.max(document.documentElement.clientHeight || window.innerHeight, 480);
+        const target = Math.round(vh * 0.82); // ~82% leaves comfortable  ~8-18% bottom + top chrome
+        mobileFiltersPanel.style.maxHeight = `${target}px`;
+        mobileFiltersPanel.classList.add('mobile-expanded-filters');
+        if (rightControls) rightControls.style.zIndex = '80';
+      } else {
+        mobileFiltersPanel.style.maxHeight = '';
+        mobileFiltersPanel.classList.remove('mobile-expanded-filters');
+        if (rightControls) rightControls.style.zIndex = '';
+      }
+      if (mobileFiltersIcon) {
+        mobileFiltersIcon.classList.toggle('fa-chevron-down', nowHidden);
+        mobileFiltersIcon.classList.toggle('fa-chevron-up', !nowHidden);
+      }
+    };
+  }
 
   // Ensure the blood button label and logic uses 'biomarkers' key (Issue #14 refactor)
   // Keep DOM id for now to minimize HTML changes; text can be updated in HTML separately if desired.
@@ -1330,6 +1400,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 400);
 
   // On resize, if we cross from mobile to desktop, close any open bottom sheet so the left inspector becomes visible.
+  // Also re-render node limit + group filters so they move to the correct container (mobile column vs desktop bottom bar).
   let resizeTimer = null;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
@@ -1338,7 +1409,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (bs && bs.getMode() !== 'closed' && !isMobileViewport()) {
         bs.close(true);
       }
-    }, 120);
+      // Move slider + filters between mobile right-column and desktop bottom on breakpoint cross
+      renderNodeLimitControl();
+      renderGroupFilters();
+    }, 140);
   });
 
   console.log("%c[AETHERIS Modular] Supplements tree + components initialized successfully.", "color:#4ade80");

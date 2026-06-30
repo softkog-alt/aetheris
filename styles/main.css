@@ -216,6 +216,21 @@
       scrollbar-color: rgba(245, 158, 11, 0.35) rgba(10, 13, 26, 0.5);
       min-height: 22px;
     }
+    /* Mobile vertical filters (right column): thin amber scroller for tall category lists */
+    #mobile-group-filters {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(245, 158, 11, 0.35) rgba(10, 13, 26, 0.5);
+    }
+
+    /* When expanded on mobile: tall list reaching near bottom of screen (5-10% bottom space left) */
+    #mobile-group-filters.mobile-expanded-filters {
+      background: rgba(10, 13, 26, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 0.625rem;
+      padding-top: 0.25rem;
+      padding-bottom: 0.5rem;
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+    }
     #bottom-controls {
       box-shadow: 0 -1px 0 rgba(0,0,0,0.6);
     }

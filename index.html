@@ -97,67 +97,91 @@
           </div>
         </div>
         
-        <!-- Premium Floating Map Controls (top right of map) -->
-        <div class="absolute top-4 right-4 flex flex-col gap-1.5 z-50">
-          <button id="btn-zoom-in" 
-                  class="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#0a0d1a]/95 border border-white/20 hover:border-white/40 text-2xl font-light backdrop-blur-md shadow-2xl active:scale-[0.94] transition-all hover:text-amber-300">
-            +
-          </button>
-          <button id="btn-zoom-out" 
-                  class="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#0a0d1a]/95 border border-white/20 hover:border-white/40 text-3xl font-light backdrop-blur-md shadow-2xl active:scale-[0.94] transition-all hover:text-amber-300">
-            −
-          </button>
-          <button id="btn-recenter" 
-                  class="w-10 h-10 flex items-center justify-center rounded-2xl bg-[#0a0d1a]/95 border border-amber-400/40 hover:border-amber-400/70 text-amber-300 backdrop-blur-md shadow-2xl active:scale-[0.94] transition-all"
-                  title="Recenter View">
-            <i class="fa-solid fa-crosshairs text-base"></i>
-          </button>
-
-          <!-- Constellation Switcher (inside the map UI) -->
-          <div class="mt-2 flex flex-col gap-1 bg-[#0a0d1a]/95 border border-white/15 rounded-2xl p-1 backdrop-blur-md">
+        <!-- Right-side Map Controls: Constellation selector first, then horizontal zooms underneath (matching width).
+             On mobile: also slider + expandable vertical category filters under the above (same column width). -->
+        <div id="right-map-controls" class="absolute top-4 right-4 z-[60] flex flex-col gap-1.5 w-[142px]">
+          <!-- Map / Constellation Selector (primary on right) -->
+          <div class="flex flex-col gap-0.5 bg-[#0a0d1a]/95 border border-white/15 rounded-2xl p-1 backdrop-blur-md w-full">
             <button id="btn-constellation-supplements"
-                    class="constellation-btn active px-3 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
+                    class="constellation-btn active w-full justify-start px-2.5 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
                     data-type="supplements">
               <i class="fa-solid fa-pills text-amber-400"></i>
               <span>Supplements</span>
             </button>
             <button id="btn-constellation-habits"
-                    class="constellation-btn px-3 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
+                    class="constellation-btn w-full justify-start px-2.5 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
                     data-type="habits">
               <i class="fa-solid fa-user-check text-emerald-400"></i>
               <span>Habits</span>
             </button>
             <button id="btn-constellation-exercises"
-                    class="constellation-btn px-3 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
+                    class="constellation-btn w-full justify-start px-2.5 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
                     data-type="exercises">
               <i class="fa-solid fa-dumbbell text-orange-400"></i>
               <span>Exercises</span>
             </button>
             <button id="btn-constellation-foods"
-                    class="constellation-btn px-3 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
+                    class="constellation-btn w-full justify-start px-2.5 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
                     data-type="foods">
               <i class="fa-solid fa-carrot text-emerald-400"></i>
               <span>Foods</span>
             </button>
             <button id="btn-constellation-environment"
-                    class="constellation-btn px-3 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
+                    class="constellation-btn w-full justify-start px-2.5 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
                     data-type="environment">
               <i class="fa-solid fa-radiation text-red-400"></i>
               <span>Environment</span>
             </button>
             <button id="btn-constellation-biomarkers"
-                    class="constellation-btn px-3 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
+                    class="constellation-btn w-full justify-start px-2.5 py-1 text-xs rounded-xl flex items-center gap-x-1.5 hover:bg-white/10 transition"
                     data-type="biomarkers">
               <i class="fa-solid fa-vial text-sky-400"></i>
               <span>Biomarkers</span>
             </button>
           </div>
+
+          <!-- Zoom controls placed horizontally *under* the selector, sized to same width -->
+          <div class="flex items-center gap-1 bg-[#0a0d1a]/95 border border-white/15 rounded-2xl p-1 backdrop-blur-md w-full">
+            <button id="btn-zoom-in" 
+                    class="flex-1 h-8 flex items-center justify-center rounded-xl bg-[#0a0d1a] border border-white/20 hover:border-white/40 text-xl font-light active:scale-[0.94] transition-all hover:text-amber-300"
+                    title="Zoom in">
+              +
+            </button>
+            <button id="btn-zoom-out" 
+                    class="flex-1 h-8 flex items-center justify-center rounded-xl bg-[#0a0d1a] border border-white/20 hover:border-white/40 text-2xl font-light active:scale-[0.94] transition-all hover:text-amber-300"
+                    title="Zoom out">
+              −
+            </button>
+            <button id="btn-recenter" 
+                    class="flex-1 h-8 flex items-center justify-center rounded-xl bg-[#0a0d1a] border border-amber-400/40 hover:border-amber-400/70 text-amber-300 active:scale-[0.94] transition-all"
+                    title="Recenter View">
+              <i class="fa-solid fa-crosshairs text-sm"></i>
+            </button>
+          </div>
+
+          <!-- Mobile-only: Node limit slider + expandable vertical filters (stacked under selector+zooms, same column width).
+               Desktop keeps horizontal at bottom. -->
+          <div id="mobile-map-extra" class="flex flex-col gap-1 md:hidden bg-[#0a0d1a]/90 border border-white/10 rounded-2xl p-1.5 backdrop-blur w-full">
+            <!-- Compact node limit slider (mobile) -->
+            <div id="mobile-node-limit-control" class="px-1"></div>
+
+            <!-- Expandable filter toggle + vertical list (mobile, avoids bad horizontal fit) -->
+            <div class="border-t border-white/10 pt-1">
+              <button id="mobile-filters-toggle"
+                      class="w-full flex items-center justify-between px-1 py-0.5 rounded-lg hover:bg-white/5 text-white/70 active:bg-white/10 transition text-left">
+                <span class="uppercase tracking-[1.5px] text-[9px] text-white/55">FILTERS</span>
+                <i id="mobile-filters-icon" class="fa-solid fa-chevron-down text-[9px]"></i>
+              </button>
+              <div id="mobile-group-filters"
+                   class="hidden flex-col gap-0.5 mt-1 overflow-y-auto px-0.5 text-xs"></div>
+            </div>
+          </div>
         </div>
 
-        <!-- Bottom bar: Node Limit slider (top row) + horizontally-scrollable group filter chips (bottom row).
-             Uses aaa-panel for the same custom thin amber scrollbar on the filters row when content overflows horizontally. -->
+        <!-- Bottom bar (desktop only): Node Limit slider + horizontal-scrollable group filter chips.
+             On mobile these live in the right column under the selector (vertical). -->
         <div id="bottom-controls"
-             class="absolute bottom-0 left-0 right-0 z-[95] pointer-events-auto flex flex-col gap-0.5 px-2 py-1 text-[10px] border-t border-white/10 bg-[#05070f]/95 backdrop-blur">
+             class="absolute bottom-0 left-0 right-0 z-[95] pointer-events-auto hidden md:flex flex-col gap-0.5 px-2 py-1 text-[10px] border-t border-white/10 bg-[#05070f]/95 backdrop-blur">
           <div id="node-limit-control" class="flex items-center gap-2 text-[10px]"></div>
           <div id="group-filters"
                class="flex items-center gap-1 overflow-x-auto whitespace-nowrap px-0.5 py-0.5"></div>
